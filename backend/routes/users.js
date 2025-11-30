@@ -97,9 +97,18 @@ router.put(
   '/profile',
   authenticate,
   [
-    body('name').optional().notEmpty().trim(),
-    body('phone').optional().notEmpty().trim(),
+    body('name').optional().trim().custom(value => {
+      if (value === '') return true; // Allow empty string
+      if (value && value.length < 1) throw new Error('Name cannot be empty');
+      return true;
+    }),
+    body('phone').optional().trim().custom(value => {
+      if (value === '') return true; // Allow empty string
+      if (value && value.length < 1) throw new Error('Phone cannot be empty');
+      return true;
+    }),
     body('email').optional().isEmail().normalizeEmail(),
+    body('bio').optional().trim(), // Bio can be empty
   ],
   async (req, res) => {
     try {
@@ -113,9 +122,9 @@ router.put(
       }
 
       const updates = {};
-      if (req.body.name) updates.name = req.body.name;
-      if (req.body.phone) updates.phone = req.body.phone;
-      if (req.body.bio) updates.bio = req.body.bio;
+      if (req.body.name !== undefined && req.body.name !== '') updates.name = req.body.name;
+      if (req.body.phone !== undefined && req.body.phone !== '') updates.phone = req.body.phone;
+      if (req.body.bio !== undefined) updates.bio = req.body.bio; // Bio can be empty string
       updates.updated_at = new Date().toISOString();
 
       // Use admin client to bypass RLS
