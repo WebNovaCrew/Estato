@@ -16,26 +16,14 @@ const { supabase } = require('../config/supabase');
 // Fix multer reference in error handler
 const MulterError = multer.MulterError;
 
-// Configure multer for multiple file uploads
+// Configure multer for multiple file uploads - Accept all files, validate later
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB per file
+    fileSize: 10 * 1024 * 1024, // 10MB per file
   },
-  fileFilter: (req, file, cb) => {
-    // Accept common image MIME types and also check file extension as fallback
-    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
-    
-    const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
-    
-    if (file.mimetype.startsWith('image/') || allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
-      cb(null, true);
-    } else {
-      console.log('Rejected file:', file.originalname, 'MIME:', file.mimetype);
-      cb(new Error(`Only image files are allowed. Received: ${file.mimetype}`), false);
-    }
-  },
+  // Remove strict file filter - accept all files and validate in route handler
+  // This prevents issues with mobile apps sending incorrect MIME types
 });
 
 // Error handling middleware for multer
@@ -255,22 +243,54 @@ router.post(
       // Upload images to Supabase Storage
       const imageUrls = [];
       if (req.files && req.files.length > 0) {
+        console.log(`Processing ${req.files.length} files for upload...`);
+        
         for (const file of req.files) {
-          const fileExt = file.originalname.split('.').pop();
+          // Validate file is an image by checking extension or mimetype
+          const allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'];
+          const fileExt = file.originalname.split('.').pop().toLowerCase();
+          const isImage = file.mimetype.startsWith('image/') || allowedExts.includes(fileExt);
+          
+          if (!isImage) {
+            console.log(`Skipping non-image file: ${file.originalname} (${file.mimetype})`);
+            continue;
+          }
+          
           const fileName = `properties/${uuidv4()}.${fileExt}`;
+          
+          // Determine correct content type
+          let contentType = file.mimetype;
+          if (!contentType.startsWith('image/')) {
+            // Fallback content type based on extension
+            const mimeMap = {
+              'jpg': 'image/jpeg',
+              'jpeg': 'image/jpeg', 
+              'png': 'image/png',
+              'gif': 'image/gif',
+              'webp': 'image/webp',
+              'heic': 'image/heic',
+              'heif': 'image/heif',
+            };
+            contentType = mimeMap[fileExt] || 'image/jpeg';
+          }
 
+          console.log(`Uploading: ${fileName} (${contentType})`);
+          
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('property-images')
             .upload(fileName, file.buffer, {
-              contentType: file.mimetype,
+              contentType: contentType,
               upsert: false,
             });
 
-          if (!uploadError) {
+          if (uploadError) {
+            console.error(`Upload error for ${fileName}:`, uploadError.message);
+          } else {
             const { data: urlData } = supabase.storage
               .from('property-images')
               .getPublicUrl(fileName);
             imageUrls.push(urlData.publicUrl);
+            console.log(`Uploaded successfully: ${urlData.publicUrl}`);
           }
         }
       }
