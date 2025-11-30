@@ -35,6 +35,15 @@ const supabaseAdmin = supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
 
+// Log admin client status for debugging
+if (supabaseAdmin) {
+  console.log('✅ Supabase Admin client initialized (RLS bypass enabled)');
+} else {
+  console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not set - Admin client NOT available!');
+  console.warn('   Property creation and user profile updates may fail due to RLS.');
+  console.warn('   Add SUPABASE_SERVICE_ROLE_KEY to your environment variables.');
+}
+
 module.exports = {
   supabase,
   supabaseAdmin,
