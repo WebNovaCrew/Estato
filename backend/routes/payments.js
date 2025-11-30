@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 
 // Initialize Razorpay (only if credentials are provided)
 let razorpay = null;
@@ -67,8 +67,9 @@ router.post(
 
       const order = await razorpay.orders.create(options);
 
-      // Store payment in database
-      const { error: paymentError } = await supabase
+      // Store payment in database - use admin client to bypass RLS
+      const dbClient = supabaseAdmin || supabase;
+      const { error: paymentError } = await dbClient
         .from('payments')
         .insert([
           {
@@ -145,8 +146,9 @@ router.post(
         });
       }
 
-      // Update payment status
-      const { data: payment, error: paymentError } = await supabase
+      // Update payment status - use admin client to bypass RLS
+      const dbClient = supabaseAdmin || supabase;
+      const { data: payments, error: paymentError } = await dbClient
         .from('payments')
         .update({
           payment_id: paymentId,
@@ -155,8 +157,9 @@ router.post(
         })
         .eq('order_id', orderId)
         .eq('user_id', req.userId)
-        .select()
-        .single();
+        .select();
+      
+      const payment = payments && payments.length > 0 ? payments[0] : null;
 
       if (paymentError) {
         return res.status(400).json({
@@ -166,8 +169,8 @@ router.post(
       }
 
       // Update user subscription
-      if (payment.plan_name) {
-        await supabase
+      if (payment && payment.plan_name) {
+        await dbClient
           .from('users')
           .update({
             subscription_plan: payment.plan_name,
@@ -199,7 +202,8 @@ router.post(
  */
 router.get('/history', authenticate, async (req, res) => {
   try {
-    const { data: payments, error } = await supabase
+    const dbClient = supabaseAdmin || supabase;
+    const { data: payments, error } = await dbClient
       .from('payments')
       .select('*')
       .eq('user_id', req.userId)
