@@ -60,16 +60,21 @@ async function getPropertyById(id) {
   }
 }
 
-// Create property
+// Create property - Use admin client to bypass RLS
 async function createProperty(propertyData) {
   try {
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS policies
+    const dbClient = supabaseAdmin || supabase;
+    const { data, error } = await dbClient
       .from('properties')
       .insert([propertyData])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Property creation error details:', error);
+      throw error;
+    }
     return { success: true, data };
   } catch (error) {
     console.error('Error creating property:', error);
@@ -77,10 +82,11 @@ async function createProperty(propertyData) {
   }
 }
 
-// Update property
+// Update property - Use admin client to bypass RLS
 async function updateProperty(id, updates) {
   try {
-    const { data, error } = await supabase
+    const dbClient = supabaseAdmin || supabase;
+    const { data, error } = await dbClient
       .from('properties')
       .update(updates)
       .eq('id', id)
@@ -95,10 +101,11 @@ async function updateProperty(id, updates) {
   }
 }
 
-// Delete property
+// Delete property - Use admin client to bypass RLS
 async function deleteProperty(id) {
   try {
-    const { error } = await supabase
+    const dbClient = supabaseAdmin || supabase;
+    const { error } = await dbClient
       .from('properties')
       .delete()
       .eq('id', id);
