@@ -242,6 +242,8 @@ router.post(
 
       // Upload images to Supabase Storage
       const imageUrls = [];
+      console.log('Files received:', req.files ? req.files.length : 0);
+      console.log('Files object:', req.files);
       if (req.files && req.files.length > 0) {
         console.log(`Processing ${req.files.length} files for upload...`);
         
