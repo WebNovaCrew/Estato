@@ -1,6 +1,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const FormData = require('form-data');
 
 // First login to get token
 const loginData = JSON.stringify({email:'finaltest@test.com', password:'Test@123'});
@@ -31,30 +32,9 @@ loginReq.write(loginData);
 loginReq.end();
 
 function testPropertyCreation(token) {
-  console.log('Testing multipart property creation WITH IMAGE...');
+  console.log('Testing multipart property creation WITH IMAGE (using form-data)...');
   
-  // Create boundary for multipart
-  const boundary = '----FormBoundary' + Math.random().toString(16).slice(2);
-  
-  // Build multipart body
-  const fields = {
-    title: 'Luxury Apartment with Image Test',
-    description: 'Modern 3BHK apartment with stunning views. Testing image upload functionality.',
-    price: '8500000',
-    propertyType: 'Apartment',
-    transactionType: 'Buy',
-    location: 'Lucknow, Uttar Pradesh',
-    area: 'Hazratganj',
-    size: '1800',
-    bedrooms: '3',
-    bathrooms: '2',
-    ownerPhone: '9876543210',
-    isFurnished: 'true',
-    yearBuilt: '2023',
-    amenities: JSON.stringify(['Lift', 'Parking', 'Security', 'Gym', 'Club House'])
-  };
-  
-  // Create a simple test image (1x1 red pixel PNG)
+  // Create a simple test image (1x1 PNG)
   const testImageBuffer = Buffer.from([
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
     0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -64,19 +44,30 @@ function testPropertyCreation(token) {
     0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
   ]);
   
-  // Build multipart body with fields
-  let bodyParts = [];
+  // Use form-data package for proper multipart handling
+  const form = new FormData();
   
-  for (const [key, value] of Object.entries(fields)) {
-    bodyParts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`));
-  }
+  // Add text fields
+  form.append('title', 'Luxury Apartment with Image Test');
+  form.append('description', 'Modern 3BHK apartment with stunning views. Testing image upload functionality.');
+  form.append('price', '8500000');
+  form.append('propertyType', 'Apartment');
+  form.append('transactionType', 'Buy');
+  form.append('location', 'Lucknow, Uttar Pradesh');
+  form.append('area', 'Hazratganj');
+  form.append('size', '1800');
+  form.append('bedrooms', '3');
+  form.append('bathrooms', '2');
+  form.append('ownerPhone', '9876543210');
+  form.append('isFurnished', 'true');
+  form.append('yearBuilt', '2023');
+  form.append('amenities', JSON.stringify(['Lift', 'Parking', 'Security', 'Gym', 'Club House']));
   
   // Add image file
-  bodyParts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="images"; filename="test-property.png"\r\nContent-Type: image/png\r\n\r\n`));
-  bodyParts.push(testImageBuffer);
-  bodyParts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
-  
-  const body = Buffer.concat(bodyParts);
+  form.append('images', testImageBuffer, {
+    filename: 'test-property.png',
+    contentType: 'image/png'
+  });
   
   const options = {
     hostname: 'champ-y6eg.onrender.com',
@@ -84,8 +75,7 @@ function testPropertyCreation(token) {
     path: '/api/properties',
     method: 'POST',
     headers: {
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Content-Length': Buffer.byteLength(body),
+      ...form.getHeaders(),
       'Authorization': 'Bearer ' + token
     }
   };
@@ -124,6 +114,5 @@ function testPropertyCreation(token) {
   });
   
   req.on('error', (e) => console.error('Request error:', e.message));
-  req.write(body);
-  req.end();
+  form.pipe(req);
 }

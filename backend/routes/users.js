@@ -121,15 +121,15 @@ router.put(
       // Use admin client to bypass RLS
       const dbClient = supabaseAdmin || supabase;
 
-      // First check if user exists
-      const { data: existingUser, error: checkError } = await dbClient
+      // First check if user exists (don't use .single() to avoid error when not found)
+      const { data: existingUsers, error: checkError } = await dbClient
         .from('users')
         .select('id')
-        .eq('id', req.userId)
-        .single();
+        .eq('id', req.userId);
 
       let data;
       let error;
+      const existingUser = existingUsers && existingUsers.length > 0 ? existingUsers[0] : null;
 
       if (!existingUser) {
         // Create user profile if it doesn't exist
