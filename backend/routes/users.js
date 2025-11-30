@@ -34,13 +34,15 @@ router.get('/profile', authenticate, async (req, res) => {
     let { data: userProfile, error } = await dbClient
       .from('users')
       .select('*')
-      .eq('id', req.userId)
-      .single();
+      .eq('id', req.userId);
 
-    if (error || !userProfile) {
-      // Return basic profile from auth metadata
+    // Handle case where user doesn't exist in users table
+    if (error || !userProfile || userProfile.length === 0) {
+      console.log('User profile not found, creating from auth metadata...');
+      
+      // Create user profile from auth metadata
       const metadata = req.user?.user_metadata || {};
-      userProfile = {
+      const newProfile = {
         id: req.userId,
         email: req.user?.email || '',
         name: metadata.name || 'User',
@@ -53,6 +55,24 @@ router.get('/profile', authenticate, async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+      // Try to create the profile in database
+      const { data: createdProfile, error: createError } = await dbClient
+        .from('users')
+        .insert([newProfile])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating user profile:', createError);
+        // Return metadata profile even if DB insert fails
+        userProfile = newProfile;
+      } else {
+        userProfile = createdProfile;
+        console.log('User profile created successfully');
+      }
+    } else {
+      userProfile = userProfile[0]; // Get first result from array
     }
 
     res.json({
