@@ -58,14 +58,15 @@ class _ScheduleVisitScreenState extends State<ScheduleVisitScreen> {
     super.dispose();
   }
 
-  void _scheduleVisit() {
+  Future<void> _scheduleVisit() async {
     final bookingProvider = Provider.of<BookingProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
 
     if (user == null) return;
 
-    bookingProvider.createBooking(
+    // Create booking via API
+    final success = await bookingProvider.createBooking(
       propertyId: widget.property.id,
       propertyTitle: widget.property.title,
       propertyOwnerId: widget.property.ownerId,
@@ -80,17 +81,28 @@ class _ScheduleVisitScreenState extends State<ScheduleVisitScreen> {
       notes: _notesController.text,
     );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Visit scheduled successfully!',
-          style: GoogleFonts.poppins(),
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Visit scheduled successfully!',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: AppColors.success,
         ),
-        backgroundColor: AppColors.success,
-      ),
-    );
-
-    Navigator.pop(context);
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            bookingProvider.errorMessage ?? 'Failed to schedule visit. Please try again.',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override

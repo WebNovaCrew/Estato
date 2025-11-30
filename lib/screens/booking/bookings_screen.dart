@@ -8,8 +8,22 @@ import '../../models/booking.dart';
 import '../../utils/app_colors.dart';
 import 'schedule_visit_screen.dart';
 
-class BookingsScreen extends StatelessWidget {
+class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
+
+  @override
+  State<BookingsScreen> createState() => _BookingsScreenState();
+}
+
+class _BookingsScreenState extends State<BookingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load bookings from API when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<BookingProvider>(context, listen: false).loadBookings();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

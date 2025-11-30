@@ -4,9 +4,37 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/property_provider.dart';
 import '../../utils/app_colors.dart';
+import 'my_properties_screen.dart';
+import 'search_history_screen.dart';
+import '../settings/privacy_settings_screen.dart';
+import '../settings/account_settings_screen.dart';
+import '../settings/app_settings_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthStatus();
+  }
+
+  Future<void> _checkAuthStatus() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.checkLoginStatus();
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,19 +42,152 @@ class ProfileScreen extends StatelessWidget {
     final propertyProvider = Provider.of<PropertyProvider>(context);
     final user = authProvider.currentUser;
 
+    // Show loading while checking auth
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                child: Image.asset(
+                  'assets/icons/Estato Logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 24),
+              CircularProgressIndicator(color: AppColors.primary),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (user == null) {
       return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(
+            'Profile',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
         body: Center(
-          child: Text(
-            'User not logged in',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              color: AppColors.textSecondary,
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.2),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset(
+                      'assets/icons/Estato Logo.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Estato Mein Swagat Hai!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'लखनऊ का अपना Real Estate App',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.secondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Login karein aur Lucknow ki sabse behtareen properties explore karein!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: Text(
+                      'Login',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/register'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.primary, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      'Create Account',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       );
     }
+
+    // Safe access to user name - handle empty name
+    final userName = user.name.isNotEmpty ? user.name : 'User';
+    final userInitial = userName[0].toUpperCase();
 
     final myProperties = propertyProvider.properties
         .where((p) => p.ownerId == user.id)
@@ -43,7 +204,10 @@ class ProfileScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              // Settings screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AccountSettingsScreen()),
+              );
             },
           ),
         ],
@@ -68,7 +232,7 @@ class ProfileScreen extends StatelessWidget {
                   radius: 50,
                   backgroundColor: AppColors.secondary,
                   child: Text(
-                    user.name[0].toUpperCase(),
+                    userInitial,
                     style: GoogleFonts.poppins(
                       fontSize: 40,
                       fontWeight: FontWeight.bold,
@@ -78,7 +242,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  user.name,
+                  userName,
                   style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -87,7 +251,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user.email,
+                  user.email.isNotEmpty ? user.email : 'No email',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.white70,
@@ -95,7 +259,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user.phone,
+                  user.phone.isNotEmpty ? user.phone : 'No phone',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.white70,
@@ -172,7 +336,10 @@ class ProfileScreen extends StatelessWidget {
             Icons.home_work_outlined,
             'My Properties',
             () {
-              // TODO: Navigate to my properties screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MyPropertiesScreen()),
+              );
             },
           ),
           _buildMenuItem(
@@ -188,7 +355,10 @@ class ProfileScreen extends StatelessWidget {
             Icons.history,
             'Search History',
             () {
-              // Show search history
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchHistoryScreen()),
+              );
             },
           ),
           const SizedBox(height: 24),
@@ -214,9 +384,34 @@ class ProfileScreen extends StatelessWidget {
           _buildMenuItem(
             context,
             Icons.privacy_tip_outlined,
-            'Privacy Policy',
+            'Privacy Settings',
             () {
-              Navigator.pushNamed(context, '/privacy');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PrivacySettingsScreen()),
+              );
+            },
+          ),
+          _buildMenuItem(
+            context,
+            Icons.settings_outlined,
+            'Account Settings',
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AccountSettingsScreen()),
+              );
+            },
+          ),
+          _buildMenuItem(
+            context,
+            Icons.settings_applications,
+            'App Settings',
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AppSettingsScreen()),
+              );
             },
           ),
           _buildMenuItem(
@@ -399,10 +594,26 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Estato is Lucknow\'s premier real estate platform for buying, selling, and renting properties.',
+              'Estato - Lucknow ka apna real estate platform! Gomti Nagar se Hazratganj, Aliganj se Indira Nagar - har jagah apna ghar dhundho.',
               style: GoogleFonts.poppins(fontSize: 14),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '🏠 Made with ❤️ in Lucknow',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               'Version 1.0.0',
               style: GoogleFonts.poppins(

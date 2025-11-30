@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -120,17 +121,16 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    
+
     if (image != null) {
-      // In production, upload to server and get URL
-      // For demo, using placeholder URLs
+      // Store the actual file path for multipart upload
       setState(() {
-        _imageUrls.add('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800');
+        _imageUrls.add(image.path);
       });
     }
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
       if (_imageUrls.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -169,19 +169,31 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         listedDate: DateTime.now(),
       );
 
-      Provider.of<PropertyProvider>(context, listen: false).addProperty(property);
+      // Create property via API
+      final success = await Provider.of<PropertyProvider>(context, listen: false).createProperty(property);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Property listed successfully!',
-            style: GoogleFonts.poppins(),
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Property listed successfully!',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: AppColors.success,
           ),
-          backgroundColor: AppColors.success,
-        ),
-      );
-
-      Navigator.pop(context);
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to list property. Please try again.',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -221,7 +233,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           image: DecorationImage(
-                            image: NetworkImage(url),
+                            image: url.startsWith('http')
+                                ? NetworkImage(url)
+                                : FileImage(File(url)) as ImageProvider,
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -300,57 +314,55 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Property Type and Transaction Type
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedPropertyType,
-                    decoration: InputDecoration(
-                      labelText: 'Property Type *',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    items: _propertyTypes.map((type) {
-                      return DropdownMenuItem(
-                        value: type,
-                        child: Text(
-                          type,
-                          style: GoogleFonts.poppins(),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedPropertyType = value!;
-                      });
-                    },
+            // Property Type
+            DropdownButtonFormField<String>(
+              value: _selectedPropertyType,
+              decoration: InputDecoration(
+                labelText: 'Property Type *',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              isExpanded: true,
+              items: _propertyTypes.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Text(
+                    type,
+                    style: GoogleFonts.poppins(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedTransactionType,
-                    decoration: InputDecoration(
-                      labelText: 'Transaction Type *',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    items: _transactionTypes.map((type) {
-                      return DropdownMenuItem(
-                        value: type,
-                        child: Text(
-                          type,
-                          style: GoogleFonts.poppins(),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedTransactionType = value!;
-                      });
-                    },
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedPropertyType = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Transaction Type
+            DropdownButtonFormField<String>(
+              value: _selectedTransactionType,
+              decoration: InputDecoration(
+                labelText: 'Transaction Type *',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              isExpanded: true,
+              items: _transactionTypes.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Text(
+                    type,
+                    style: GoogleFonts.poppins(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedTransactionType = value!;
+                });
+              },
             ),
             const SizedBox(height: 16),
 
@@ -497,38 +509,43 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Year Built and Furnished
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _yearBuiltController,
-                    decoration: InputDecoration(
-                      labelText: 'Year Built *',
-                      hintText: '2020',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                  ),
+            // Year Built
+            TextFormField(
+              controller: _yearBuiltController,
+              decoration: InputDecoration(
+                labelText: 'Year Built *',
+                hintText: '2020',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+            ),
+            const SizedBox(height: 16),
+
+            // Furnished
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[400]!),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                title: Text(
+                  'Furnished',
+                  style: GoogleFonts.poppins(fontSize: 14),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SwitchListTile(
-                    title: Text(
-                      'Furnished',
-                      style: GoogleFonts.poppins(),
-                    ),
-                    value: _isFurnished,
-                    onChanged: (value) {
-                      setState(() {
-                        _isFurnished = value;
-                      });
-                    },
-                    activeColor: AppColors.primary,
-                  ),
+                subtitle: Text(
+                  'Is the property furnished?',
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
                 ),
-              ],
+                value: _isFurnished,
+                onChanged: (value) {
+                  setState(() {
+                    _isFurnished = value;
+                  });
+                },
+                activeColor: AppColors.primary,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
             ),
             const SizedBox(height: 16),
 

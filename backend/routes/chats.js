@@ -8,6 +8,7 @@ const {
   sendMessage,
 } = require('../config/database');
 const { supabase } = require('../config/supabase');
+const { emitNewMessage } = require('../services/socket');
 
 /**
  * @route   GET /api/chats
@@ -214,6 +215,13 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
 
     if (!result.success) {
       return res.status(400).json(result);
+    }
+
+    // Emit real-time message to chat participants
+    try {
+      emitNewMessage(req.params.chatId, result.data);
+    } catch (socketError) {
+      console.log('Socket.IO not available, message sent via API only');
     }
 
     res.status(201).json({

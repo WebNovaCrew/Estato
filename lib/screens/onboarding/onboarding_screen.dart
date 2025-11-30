@@ -17,26 +17,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
-      title: 'Find Your Dream Home',
-      description: 'Browse thousands of properties in Lucknow. Find the perfect home that matches your lifestyle and budget.',
+      title: 'Lucknow Mein Ghar Dhundho',
+      description: 'Gomti Nagar se Hazratganj, Aliganj se Indira Nagar - Lucknow ke har mohalle mein apna sapno ka ghar dhundho. Nawabi shahar mein modern living!',
       image: Icons.home_rounded,
       color: AppColors.primary,
     ),
     OnboardingPage(
-      title: 'Sell with Confidence',
-      description: 'List your property easily and reach thousands of potential buyers. Get the best price for your property.',
+      title: 'Becho Bharose Ke Saath',
+      description: 'Apni property list karo aur hazaron Lucknowites tak pahuncho. Sahi daam, sahi samay - kyunki yahan sab apne hain!',
       image: Icons.sell_rounded,
       color: AppColors.secondary,
     ),
     OnboardingPage(
-      title: 'Connect with Agents',
-      description: 'Chat directly with verified agents. Get expert advice and schedule property visits at your convenience.',
+      title: 'Local Agents Se Baat Karo',
+      description: 'Lucknow ke verified agents se seedha baat karo. Chikan ke jaisi fine service - har sawaal ka jawaab, har visit scheduled!',
       image: Icons.people_rounded,
       color: AppColors.accent,
     ),
     OnboardingPage(
-      title: 'Trust & Safety',
-      description: 'All properties are verified. Your data is secure. Experience seamless real estate transactions with Estato.',
+      title: 'Bharosa Aur Suraksha',
+      description: 'Har property verified hai. Aapka data safe hai. Lucknow ki tehzeeb ke saath modern real estate experience - Estato ke saath!',
       image: Icons.verified_user_rounded,
       color: AppColors.success,
     ),

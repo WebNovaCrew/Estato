@@ -29,7 +29,7 @@ class PrivacyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Last Updated: November 4, 2025',
+              'Last Updated: November 30, 2025',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -91,7 +91,7 @@ class PrivacyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Email: privacy@estato.com\nPhone: +91 9876543210',
+              'Email: support@estatoprop.com\nPhone: +91 9872364476',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: AppColors.primary,

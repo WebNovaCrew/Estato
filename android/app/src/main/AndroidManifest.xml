@@ -1,33 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- Internet Permission -->
+    <!-- Internet Permission - Required for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Phone Call Permission -->
-    <uses-permission android:name="android.permission.CALL_PHONE" />
-    
-    <!-- Camera and Gallery Permissions for Image Picker -->
+    <!-- Camera Permission - Required for profile picture upload -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+    
+    <!-- Storage Permissions - Required for profile picture upload (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    
-    <!-- Location Permissions (for future map integration) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    
-    <!-- Storage Permissions -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        android:minSdkVersion="30" />
     
     <application
         android:label="Estato"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
-        android:requestLegacyExternalStorage="true">
+        android:icon="@mipmap/launcher_icon"
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -56,11 +45,6 @@
             android:name="flutterEmbedding"
             android:value="2" />
         
-        <!-- Google Maps API Key -->
-        <!-- TODO: Replace YOUR_GOOGLE_MAPS_API_KEY with your actual API key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_GOOGLE_MAPS_API_KEY"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -71,14 +55,6 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
-        </intent>
-        
-        <!-- Phone Intent -->
-        <intent>
-            <action android:name="android.intent.action.DIAL" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.CALL" />
         </intent>
         
         <!-- Browser Intent for URL Launcher -->

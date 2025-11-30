@@ -2,14 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
-const Razorpay = require('razorpay');
 const { supabase } = require('../config/supabase');
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Initialize Razorpay (only if credentials are provided)
+let razorpay = null;
+if (process.env.RAZORPAY_KEY_ID && 
+    process.env.RAZORPAY_KEY_SECRET && 
+    process.env.RAZORPAY_KEY_ID !== 'your_razorpay_key_id' &&
+    process.env.RAZORPAY_KEY_SECRET !== 'your_razorpay_key_secret') {
+  try {
+    const Razorpay = require('razorpay');
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  } catch (error) {
+    console.warn('⚠️  Razorpay not available:', error.message);
+  }
+}
 
 /**
  * @route   POST /api/payments/create
@@ -35,6 +45,14 @@ router.post(
       }
 
       const { amount, planName } = req.body;
+
+      // Check if Razorpay is configured
+      if (!razorpay) {
+        return res.status(503).json({
+          success: false,
+          error: 'Payment gateway not configured. Please configure Razorpay credentials.',
+        });
+      }
 
       // Create Razorpay order
       const options = {

@@ -122,34 +122,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // House Icon
+                      // App Logo
                       Container(
-                        width: 120,
-                        height: 120,
+                        width: 150,
+                        height: 150,
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Icon(
-                              Icons.home,
-                              size: 70,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                            Positioned(
-                              bottom: 30,
-                              child: Text(
-                                'E',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 40,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.secondary,
-                                ),
-                              ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 30,
+                              offset: const Offset(0, 15),
                             ),
                           ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Image.asset(
+                            'assets/icons/Estato Logo.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -166,43 +158,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 8),
                       
-                      // Tagline
-                      RichText(
-                        text: TextSpan(
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            letterSpacing: 0.5,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: 'Your ',
-                              style: GoogleFonts.poppins(
-                                color: const Color(0xFF62B6CB),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'Home',
-                              style: GoogleFonts.poppins(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            TextSpan(
-                              text: ', Our ',
-                              style: GoogleFonts.poppins(
-                                color: const Color(0xFF62B6CB),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'Priority',
-                              style: GoogleFonts.poppins(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                      // Tagline - Lucknow Pride
+                      Text(
+                        'लखनऊ का अपना App',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.secondary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nawabi Andaaz, Modern Ghar',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
                     ],

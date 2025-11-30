@@ -1,13 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const twilio = require('twilio');
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Initialize Twilio client (only if credentials are provided)
+let twilioClient = null;
+if (process.env.TWILIO_ACCOUNT_SID && 
+    process.env.TWILIO_AUTH_TOKEN && 
+    process.env.TWILIO_ACCOUNT_SID !== 'your_twilio_account_sid' &&
+    process.env.TWILIO_AUTH_TOKEN !== 'your_twilio_auth_token') {
+  try {
+    const twilio = require('twilio');
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+  } catch (error) {
+    console.warn('⚠️  Twilio not available:', error.message);
+  }
+}
 
 // In-memory OTP storage (use Redis in production)
 const otpStore = new Map();
@@ -55,29 +65,28 @@ router.post(
 
       // Send OTP via SMS
       if (phone) {
-        try {
-          await twilioClient.messages.create({
-            body: `Your Estato verification code is: ${otp}. Valid for ${process.env.OTP_EXPIRE_MINUTES || 10} minutes.`,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: phone,
-          });
-        } catch (twilioError) {
-          console.error('Twilio error:', twilioError);
-          // In development, return OTP in response
-          if (process.env.NODE_ENV === 'development') {
-            return res.json({
-              success: true,
-              message: 'OTP sent successfully (development mode)',
-              data: {
-                otp: otp, // Only in development
-                expiresIn: process.env.OTP_EXPIRE_MINUTES || 10,
-              },
+        if (twilioClient) {
+          try {
+            await twilioClient.messages.create({
+              body: `Your Estato verification code is: ${otp}. Valid for ${process.env.OTP_EXPIRE_MINUTES || 10} minutes.`,
+              from: process.env.TWILIO_PHONE_NUMBER,
+              to: phone,
             });
+          } catch (twilioError) {
+            console.error('Twilio error:', twilioError);
+            // In development, log OTP
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[DEV] OTP for ${phone}: ${otp} (Twilio failed)`);
+            } else {
+              return res.status(500).json({
+                success: false,
+                error: 'Failed to send OTP via SMS',
+              });
+            }
           }
-          return res.status(500).json({
-            success: false,
-            error: 'Failed to send OTP via SMS',
-          });
+        } else {
+          // Twilio not configured, log OTP in development
+          console.log(`[DEV] OTP for ${phone}: ${otp} (Twilio not configured)`);
         }
       }
 

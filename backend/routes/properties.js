@@ -68,12 +68,91 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/properties/my-listings
+ * @desc    Get current user's properties
+ * @access  Private
+ */
+router.get('/my-listings', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('owner_id', req.userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting user properties:', error);
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: data || [],
+      count: data ? data.length : 0,
+    });
+  } catch (error) {
+    console.error('Get my listings error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+    });
+  }
+});
+
+/**
+ * @route   GET /api/properties/featured
+ * @desc    Get featured properties
+ * @access  Public
+ */
+router.get('/featured', optionalAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('is_featured', true)
+      .eq('status', 'approved')
+      .limit(10);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: data || [],
+      count: data ? data.length : 0,
+    });
+  } catch (error) {
+    console.error('Get featured properties error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+    });
+  }
+});
+
+/**
  * @route   GET /api/properties/:id
  * @desc    Get property by ID
  * @access  Public
  */
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
+    // Validate UUID format to prevent invalid queries
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid property ID format',
+      });
+    }
+
     const result = await getPropertyById(req.params.id);
 
     if (!result.success) {

@@ -32,7 +32,7 @@ if (missingEnvVars.length > 0) {
 
 // Import routes (only after env vars are verified)
 let authRoutes, otpRoutes, userRoutes, propertyRoutes, favoriteRoutes;
-let chatRoutes, bookingRoutes, paymentRoutes, adminRoutes, notificationRoutes;
+let chatRoutes, bookingRoutes, paymentRoutes, adminRoutes, notificationRoutes, settingsRoutes;
 
 try {
   authRoutes = require('./routes/auth');
@@ -45,6 +45,7 @@ try {
   paymentRoutes = require('./routes/payments');
   adminRoutes = require('./routes/admin');
   notificationRoutes = require('./routes/notifications');
+  settingsRoutes = require('./routes/settings');
 } catch (error) {
   console.error('❌ Error loading routes:', error.message);
   console.error('');
@@ -57,6 +58,10 @@ try {
 const app = express();
 // Render automatically sets PORT, fallback to 3000 for local development
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy - Required for Render and other reverse proxies
+// This fixes the X-Forwarded-For header issue with express-rate-limit
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -100,6 +105,62 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Delete account webpage route (for Play Store compliance)
+app.get('/delete-account', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delete Account - Estato</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+            h1 { color: #333; }
+            .instructions { background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .contact { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+            .data-info { background: #d1ecf1; padding: 15px; border-left: 4px solid #17a2b8; margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <h1>Delete Your Estato Account</h1>
+        <p>We're sorry to hear you want to delete your account. Please follow these steps:</p>
+
+        <div class="instructions">
+            <h3>How to Delete Your Account:</h3>
+            <ol>
+                <li>Send an email to <strong>support@estato.com</strong></li>
+                <li>Include your registered email address and phone number</li>
+                <li>Subject line: "Delete My Account"</li>
+                <li>Include any specific requests about data retention</li>
+            </ol>
+        </div>
+
+        <div class="data-info">
+            <h3>What Data Will Be Deleted:</h3>
+            <ul>
+                <li>Your profile information (name, email, phone)</li>
+                <li>All your chat messages and conversations</li>
+                <li>Your property favorites and saved searches</li>
+                <li>Property view history</li>
+                <li>All booking information</li>
+            </ul>
+            <p><strong>Retention Period:</strong> Account deletion will be processed within 30 days of your request.</p>
+        </div>
+
+        <div class="contact">
+            <h3>Contact Information:</h3>
+            <p><strong>Email:</strong> support@estato.com</p>
+            <p><strong>Subject:</strong> Delete My Account</p>
+            <p><strong>Response Time:</strong> Within 48 hours</p>
+        </div>
+
+        <p>If you have any questions, please contact us before deleting your account. You can always create a new account later if needed.</p>
+    </body>
+    </html>
+  `);
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/otp', otpRoutes);
@@ -111,6 +172,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -144,12 +206,18 @@ app.use((err, req, res, next) => {
 
 // Start server with error handling
 try {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 Estato API Server running on port ${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     console.log(`✅ Server started successfully!`);
   });
+
+  // Initialize Socket.IO
+  const { initializeSocket } = require('./services/socket');
+  initializeSocket(server);
+  console.log(`🔌 Socket.IO initialized for real-time communication`);
+
 } catch (error) {
   console.error('❌ Failed to start server:', error.message);
   console.error('Stack trace:', error.stack);

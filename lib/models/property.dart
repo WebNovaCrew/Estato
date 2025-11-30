@@ -19,8 +19,7 @@ class Property {
   final int yearBuilt;
   final DateTime listedDate;
   final bool isFeatured;
-  final double? latitude;
-  final double? longitude;
+  final String status; // pending, approved, rejected
 
   Property({
     required this.id,
@@ -43,34 +42,33 @@ class Property {
     required this.yearBuilt,
     required this.listedDate,
     this.isFeatured = false,
-    this.latitude,
-    this.longitude,
+    this.status = 'pending',
   });
 
   factory Property.fromJson(Map<String, dynamic> json) {
+    // Handle both camelCase (app) and snake_case (backend) field names
     return Property(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
       price: (json['price'] ?? 0).toDouble(),
-      propertyType: json['propertyType'] ?? '',
-      transactionType: json['transactionType'] ?? '',
+      propertyType: json['propertyType'] ?? json['property_type'] ?? '',
+      transactionType: json['transactionType'] ?? json['transaction_type'] ?? '',
       location: json['location'] ?? '',
       area: json['area'] ?? '',
       size: (json['size'] ?? 0).toDouble(),
       bedrooms: json['bedrooms'] ?? 0,
       bathrooms: json['bathrooms'] ?? 0,
       images: List<String>.from(json['images'] ?? []),
-      ownerId: json['ownerId'] ?? '',
-      ownerName: json['ownerName'] ?? '',
-      ownerPhone: json['ownerPhone'] ?? '',
+      ownerId: json['ownerId'] ?? json['owner_id']?.toString() ?? '',
+      ownerName: json['ownerName'] ?? json['owner_name'] ?? '',
+      ownerPhone: json['ownerPhone'] ?? json['owner_phone'] ?? '',
       amenities: List<String>.from(json['amenities'] ?? []),
-      isFurnished: json['isFurnished'] ?? false,
-      yearBuilt: json['yearBuilt'] ?? 0,
-      listedDate: DateTime.parse(json['listedDate'] ?? DateTime.now().toIso8601String()),
-      isFeatured: json['isFeatured'] ?? false,
-      latitude: json['latitude']?.toDouble(),
-      longitude: json['longitude']?.toDouble(),
+      isFurnished: json['isFurnished'] ?? json['is_furnished'] ?? false,
+      yearBuilt: json['yearBuilt'] ?? json['year_built'] ?? 0,
+      listedDate: DateTime.parse(json['listedDate'] ?? json['listed_date'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
+      isFeatured: json['isFeatured'] ?? json['is_featured'] ?? false,
+      status: json['status'] ?? 'pending',
     );
   }
 
@@ -96,8 +94,7 @@ class Property {
       'yearBuilt': yearBuilt,
       'listedDate': listedDate.toIso8601String(),
       'isFeatured': isFeatured,
-      'latitude': latitude,
-      'longitude': longitude,
+      'status': status,
     };
   }
 }

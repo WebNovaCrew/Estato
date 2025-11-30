@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../utils/demo_credentials.dart';
+import '../../services/api_client.dart';
 import '../../utils/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -154,6 +154,139 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  void _showForgotPasswordDialog() {
+    final forgotEmailController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Reset Password',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter your email address and we\'ll send you a link to reset your password.',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: forgotEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final email = forgotEmailController.text.trim();
+                      if (email.isEmpty || !email.contains('@')) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Please enter a valid email'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+
+                      try {
+                        final response = await ApiClient.forgotPassword(email);
+                        
+                        Navigator.pop(context);
+                        
+                        if (response['success'] == true) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Password reset link sent to $email',
+                                style: GoogleFonts.poppins(),
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                response['error'] ?? 'Failed to send reset email',
+                                style: GoogleFonts.poppins(),
+                              ),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: ${e.toString()}'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: isLoading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(
+                      'Send Reset Link',
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -177,36 +310,30 @@ class _LoginScreenState extends State<LoginScreen>
                   children: [
                     const SizedBox(height: 40),
                     
-                    // Animated Logo with gradient
+                    // Animated Logo
                     FadeTransition(
                       opacity: _fadeAnimation,
                       child: ScaleTransition(
                         scale: _logoScaleAnimation,
-                        child: RotationTransition(
-                          turns: _logoRotationAnimation,
-                          child: Center(
-                            child: Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: AppColors.primaryGradient,
+                        child: Center(
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
                                 ),
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.home_rounded,
-                                size: 50,
-                                color: Colors.white,
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.asset(
+                                'assets/icons/Estato Logo.png',
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),
@@ -223,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen>
                         child: Column(
                           children: [
                             Text(
-                              'Welcome Back!',
+                              'Wapas Aaye!',
                               style: GoogleFonts.poppins(
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
@@ -237,9 +364,19 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                               textAlign: TextAlign.center,
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'लखनऊ का अपना Real Estate App',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                             const SizedBox(height: 8),
                             Text(
-                              'Login to continue to Estato',
+                              'Login karein aur ghar dhundho!',
                               style: GoogleFonts.poppins(
                                 fontSize: 15,
                                 color: AppColors.textSecondary,
@@ -314,7 +451,7 @@ class _LoginScreenState extends State<LoginScreen>
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () {
-                            // Handle forgot password
+                            _showForgotPasswordDialog();
                           },
                           child: Text(
                             'Forgot Password?',
@@ -418,158 +555,6 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     const SizedBox(height: 20),
                     
-                    // Demo Credentials Info
-                    _buildAnimatedField(
-                      index: 5,
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryUltraLight.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: AppColors.primary.withOpacity(0.2),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 20,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Demo Mode',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Use any email/password or try these:',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...DemoLoginInfo.credentials.take(2).map((cred) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 60,
-                                child: Text(
-                                  '${cred['role']}:',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.secondary,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  '${cred['email']} / ${cred['password']}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
-                        const SizedBox(height: 4),
-                        TextButton(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text(
-                                  DemoLoginInfo.title,
-                                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                                ),
-                                content: SingleChildScrollView(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        DemoLoginInfo.description,
-                                        style: GoogleFonts.poppins(fontSize: 13),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      ...DemoLoginInfo.credentials.map((cred) => Container(
-                                        margin: const EdgeInsets.only(bottom: 12),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[100],
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              cred['role']!,
-                                              style: GoogleFonts.poppins(
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.primary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text('Email: ${cred['email']}', 
-                                              style: GoogleFonts.poppins(fontSize: 12)),
-                                            Text('Password: ${cred['password']}',
-                                              style: GoogleFonts.poppins(fontSize: 12)),
-                                          ],
-                                        ),
-                                      )),
-                                    ],
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Close'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'View all demo accounts →',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              foreground: Paint()
-                                ..shader = LinearGradient(
-                                  colors: AppColors.primaryGradient,
-                                ).createShader(
-                                  const Rect.fromLTWH(0, 0, 200, 70),
-                                ),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                      ),
-                    ),
                   
                     // Register Link
                     FadeTransition(

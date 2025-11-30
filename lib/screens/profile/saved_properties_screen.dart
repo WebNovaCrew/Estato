@@ -6,9 +6,22 @@ import '../../providers/property_provider.dart';
 import '../../widgets/property_card.dart';
 import '../../utils/app_colors.dart';
 import '../property/property_detail_screen.dart';
-
-class SavedPropertiesScreen extends StatelessWidget {
+class SavedPropertiesScreen extends StatefulWidget {
   const SavedPropertiesScreen({super.key});
+
+  @override
+  State<SavedPropertiesScreen> createState() => _SavedPropertiesScreenState();
+}
+
+class _SavedPropertiesScreenState extends State<SavedPropertiesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load favorites from API when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<PropertyProvider>(context, listen: false).loadFavorites();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,22 +31,42 @@ class SavedPropertiesScreen extends StatelessWidget {
 
     if (user == null) {
       return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Saved Properties',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+        ),
         body: Center(
-          child: Text(
-            'Please login to view saved properties',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.favorite_border,
+                size: 64,
+                color: AppColors.textLight,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Please login to view saved properties',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pushNamed(context, '/login'),
+                child: const Text('Login'),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    final favoriteIds = user.favoriteProperties;
-    final savedProperties = propertyProvider.properties
-        .where((property) => favoriteIds.contains(property.id))
-        .toList();
+    // Use favorites from PropertyProvider (loaded from API)
+    final savedProperties = propertyProvider.favoriteProperties;
 
     return Scaffold(
       appBar: AppBar(

@@ -24,6 +24,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    // Stop polling when leaving chat
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.closeChat();
     super.dispose();
   }
 

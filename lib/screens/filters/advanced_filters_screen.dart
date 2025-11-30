@@ -20,6 +20,36 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen> {
   late int _minBathrooms;
   late int _maxBathrooms;
   bool? _isFurnished;
+  String? _selectedArea;
+
+  // Popular Lucknow Areas
+  final List<String> _lucknowAreas = [
+    'All Areas',
+    'Gomti Nagar',
+    'Hazratganj',
+    'Aliganj',
+    'Indira Nagar',
+    'Mahanagar',
+    'Aminabad',
+    'Chowk',
+    'Alambagh',
+    'Rajajipuram',
+    'Vikas Nagar',
+    'Jankipuram',
+    'Chinhat',
+    'Faizabad Road',
+    'Kanpur Road',
+    'Sitapur Road',
+    'Aashiana',
+    'Sushant Golf City',
+    'Shaheed Path',
+    'Vrindavan Yojana',
+    'Gomti Nagar Extension',
+    'Raebareli Road',
+    'IIM Road',
+    'Telibagh',
+    'Kursi Road',
+  ];
 
   @override
   void initState() {
@@ -98,6 +128,52 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            // Lucknow Areas Section
+            _buildSection(
+              title: 'Lucknow Areas 📍',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _lucknowAreas.map((area) {
+                  final isSelected = _selectedArea == area || (_selectedArea == null && area == 'All Areas');
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedArea = area == 'All Areas' ? null : area;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : AppColors.border,
+                        ),
+                        boxShadow: isSelected ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
+                      ),
+                      child: Text(
+                        area,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // Price Range
             _buildSection(
               title: 'Price Range',

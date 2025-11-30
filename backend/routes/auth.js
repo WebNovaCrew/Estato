@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 const { body, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 
@@ -51,22 +51,41 @@ router.post(
         });
       }
 
-      // Create user profile in database
-      const { error: profileError } = await supabase.from('users').insert([
+      // Create user profile in database using admin client to bypass RLS
+      const dbClient = supabaseAdmin || supabase;
+      const { error: profileError } = await dbClient.from('users').insert([
         {
           id: authData.user.id,
           email,
           name,
           phone,
           user_type: userType,
+          role: 'user',
+          verified: false,
+          subscription_plan: 'free',
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       ]);
 
       if (profileError) {
         console.error('Error creating user profile:', profileError);
-        // User is created in Auth but not in database
-        // In production, you might want to handle this differently
+        // Try to create profile without admin client as fallback
+        if (supabaseAdmin) {
+          const { error: fallbackError } = await supabase.from('users').insert([
+            {
+              id: authData.user.id,
+              email,
+              name,
+              phone,
+              user_type: userType,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+          if (fallbackError) {
+            console.error('Fallback profile creation also failed:', fallbackError);
+          }
+        }
       }
 
       res.status(201).json({
@@ -75,6 +94,8 @@ router.post(
         data: {
           user: authData.user,
           session: authData.session,
+          accessToken: authData.session?.access_token || null,
+          refreshToken: authData.session?.refresh_token || null,
         },
       });
     } catch (error) {
@@ -125,14 +146,49 @@ router.post(
       }
 
       // Get user profile
-      const { data: userProfile, error: profileError } = await supabase
+      let { data: userProfile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', data.user.id)
         .single();
 
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
+      // If profile doesn't exist, create it from user metadata using admin client
+      if (profileError || !userProfile) {
+        console.log('User profile not found, creating from metadata...');
+        const metadata = data.user.user_metadata || {};
+        const dbClient = supabaseAdmin || supabase;
+        
+        const { data: newProfile, error: createError } = await dbClient
+          .from('users')
+          .insert([{
+            id: data.user.id,
+            email: data.user.email,
+            name: metadata.name || 'User',
+            phone: metadata.phone || '',
+            user_type: metadata.userType || 'buyer',
+            role: 'user',
+            verified: false,
+            subscription_plan: 'free',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }])
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating user profile on login:', createError);
+          // Return user data even without profile
+          userProfile = {
+            id: data.user.id,
+            email: data.user.email,
+            name: metadata.name || 'User',
+            phone: metadata.phone || '',
+            user_type: metadata.userType || 'buyer',
+          };
+        } else {
+          userProfile = newProfile;
+          console.log('User profile created successfully on login');
+        }
       }
 
       res.json({
@@ -243,18 +299,60 @@ router.post('/refresh', async (req, res) => {
  */
 router.get('/me', authenticate, async (req, res) => {
   try {
+    // Use admin client to bypass RLS
+    const dbClient = supabaseAdmin || supabase;
+    
     // Get user profile
-    const { data: userProfile, error } = await supabase
+    let { data: userProfile, error } = await dbClient
       .from('users')
       .select('*')
       .eq('id', req.userId)
       .single();
 
-    if (error) {
-      return res.status(404).json({
-        success: false,
-        error: 'User profile not found',
-      });
+    // If profile doesn't exist, create it from user metadata
+    if (error || !userProfile) {
+      console.log('User profile not found in /me, creating from metadata...');
+      console.log('User ID:', req.userId);
+      console.log('Error:', error);
+      
+      const metadata = req.user?.user_metadata || {};
+      
+      const { data: newProfile, error: createError } = await dbClient
+        .from('users')
+        .insert([{
+          id: req.userId,
+          email: req.user?.email || '',
+          name: metadata.name || 'User',
+          phone: metadata.phone || '',
+          user_type: metadata.userType || 'buyer',
+          role: 'user',
+          verified: false,
+          subscription_plan: 'free',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating user profile:', createError);
+        // Return basic profile from auth data instead of 404
+        userProfile = {
+          id: req.userId,
+          email: req.user?.email || '',
+          name: metadata.name || 'User',
+          phone: metadata.phone || '',
+          user_type: metadata.userType || 'buyer',
+          role: 'user',
+          verified: false,
+          avatar_url: null,
+          bio: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        userProfile = newProfile;
+      }
     }
 
     res.json({

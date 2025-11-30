@@ -96,9 +96,13 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(
             child: Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: const BorderRadius.only(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: AppColors.primaryGradient,
+                ),
+                borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(30),
                   bottomRight: Radius.circular(30),
                 ),
@@ -109,38 +113,42 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hello, ${authProvider.currentUser?.name ?? "User"}!',
-                            style: GoogleFonts.poppins(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on, size: 16, color: AppColors.secondary),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Lucknow, UP',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: Colors.white70,
-                                ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hello, ${(authProvider.currentUser?.name.isNotEmpty == true) ? authProvider.currentUser!.name : "User"}!',
+                              style: GoogleFonts.poppins(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
-                            ],
-                          ),
-                        ],
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 16, color: AppColors.accent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'लखनऊ, उत्तर प्रदेश 🏠',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 12),
                       CircleAvatar(
                         radius: 25,
                         backgroundColor: AppColors.secondary,
                         child: Text(
-                          authProvider.currentUser?.name[0].toUpperCase() ?? 'U',
+                          (authProvider.currentUser?.name.isNotEmpty == true) ? authProvider.currentUser!.name[0].toUpperCase() : 'U',
                           style: GoogleFonts.poppins(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -170,22 +178,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 14,
                         ),
                         prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.map_outlined, color: AppColors.primary),
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/property-map');
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.tune, color: AppColors.primary),
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/advanced-filters');
-                              },
-                            ),
-                          ],
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.tune, color: AppColors.primary),
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/advanced-filters');
+                          },
                         ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -238,6 +235,97 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   );
                 },
+              ),
+            ),
+          ),
+          
+          // Quick Tools Section
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildQuickToolCard(
+                      icon: Icons.calculate_outlined,
+                      title: 'EMI Calculator',
+                      color: AppColors.primary,
+                      onTap: () => Navigator.pushNamed(context, '/emi-calculator'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildQuickToolCard(
+                      icon: Icons.compare_arrows,
+                      title: 'Compare',
+                      color: AppColors.secondary,
+                      onTap: () => Navigator.pushNamed(context, '/compare-properties'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildQuickToolCard(
+                      icon: Icons.history,
+                      title: 'Recent',
+                      color: AppColors.accent,
+                      onTap: () => Navigator.pushNamed(context, '/recently-viewed'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Popular Lucknow Areas Section
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Popular Areas ',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        '📍',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Lucknow ke mashhoor mohalle',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _buildAreaChip('Gomti Nagar', '🏢'),
+                        _buildAreaChip('Hazratganj', '🛍️'),
+                        _buildAreaChip('Aliganj', '🏠'),
+                        _buildAreaChip('Indira Nagar', '🌳'),
+                        _buildAreaChip('Mahanagar', '🏘️'),
+                        _buildAreaChip('Sushant Golf City', '⛳'),
+                        _buildAreaChip('Jankipuram', '🏡'),
+                        _buildAreaChip('Chinhat', '🌿'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -410,7 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildOtherContent() {
     if (_selectedIndex == 1) {
       return const SavedPropertiesScreen();
-    } else if (_selectedIndex == 3) {
+    } else if (_selectedIndex == 4) {
       return const ProfileScreen();
     }
     return const SizedBox();
@@ -472,6 +560,82 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       backgroundColor: AppColors.secondary,
       child: const Icon(Icons.add, size: 32, color: Colors.white),
+    );
+  }
+
+  Widget _buildQuickToolCard({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAreaChip(String area, String emoji) {
+    return GestureDetector(
+      onTap: () {
+        Provider.of<PropertyProvider>(context, listen: false).searchProperties(area);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$area mein properties dhundh rahe hain...'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primary.withOpacity(0.1), AppColors.secondary.withOpacity(0.1)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(
+              area,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

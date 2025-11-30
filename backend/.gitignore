@@ -36,3 +36,14 @@ coverage/
 tmp/
 temp/
 
+# Test files (exclude from production)
+test-*.js
+*-test.js
+comprehensive-test.js
+count-working-routes.js
+fix-*.js
+final-*.js
+production-readiness-assessment.js
+render-deployment-check.js
+complete-working-demo.js
+

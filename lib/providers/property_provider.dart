@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import '../models/property.dart';
+import '../services/api_client.dart';
 
 class PropertyProvider with ChangeNotifier {
   List<Property> _properties = [];
   List<Property> _filteredProperties = [];
+  List<Property> _favoriteProperties = [];
+  List<String> _favoriteIds = [];
   String _searchQuery = '';
   String _selectedPropertyType = 'All';
   String _selectedTransactionType = 'All';
@@ -17,6 +20,8 @@ class PropertyProvider with ChangeNotifier {
   double _minSize = 0;
   double _maxSize = double.infinity;
   bool? _isFurnished;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   List<Property> get properties => _filteredProperties.isEmpty && _searchQuery.isEmpty 
       ? _properties 
@@ -24,18 +29,180 @@ class PropertyProvider with ChangeNotifier {
   
   List<Property> get featuredProperties => 
       _properties.where((p) => p.isFeatured).toList();
+  
+  List<Property> get favoriteProperties => _favoriteProperties;
+  List<String> get favoriteIds => _favoriteIds;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   PropertyProvider() {
-    _loadSampleProperties();
+    loadProperties();
   }
 
+  /// Load properties from API
+  Future<void> loadProperties({
+    String? propertyType,
+    String? transactionType,
+    double? minPrice,
+    double? maxPrice,
+    String? area,
+    String? search,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await ApiClient.getProperties(
+        propertyType: propertyType != 'All' ? propertyType : null,
+        transactionType: transactionType != 'All' ? transactionType : null,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        area: area != 'All' ? area : null,
+        search: search,
+      );
+
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'] ?? [];
+        _properties = data.map((json) => Property.fromJson(json)).toList();
+        _filteredProperties = List.from(_properties);
+      } else {
+        _errorMessage = response['error'] ?? 'Failed to load properties';
+        // Load sample data as fallback
+        _loadSampleProperties();
+      }
+    } catch (e) {
+      _errorMessage = 'Network error. Showing cached data.';
+      _loadSampleProperties();
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Load favorites from API
+  Future<void> loadFavorites() async {
+    try {
+      final response = await ApiClient.getFavorites();
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'] ?? [];
+        _favoriteIds = data.map((item) => item['property_id']?.toString() ?? '').toList();
+        _favoriteProperties = data
+            .where((item) => item['properties'] != null)
+            .map((item) => Property.fromJson(item['properties']))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  /// Add property to favorites via API
+  Future<bool> addToFavorites(String propertyId) async {
+    try {
+      final response = await ApiClient.addFavorite(propertyId);
+      if (response['success'] == true) {
+        _favoriteIds.add(propertyId);
+        final property = getPropertyById(propertyId);
+        if (property != null) {
+          _favoriteProperties.add(property);
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+    return false;
+  }
+
+  /// Remove property from favorites via API
+  Future<bool> removeFromFavorites(String propertyId) async {
+    try {
+      final response = await ApiClient.removeFavorite(propertyId);
+      if (response['success'] == true) {
+        _favoriteIds.remove(propertyId);
+        _favoriteProperties.removeWhere((p) => p.id == propertyId);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+    return false;
+  }
+
+  /// Toggle favorite status
+  Future<bool> toggleFavorite(String propertyId) async {
+    if (_favoriteIds.contains(propertyId)) {
+      return await removeFromFavorites(propertyId);
+    } else {
+      return await addToFavorites(propertyId);
+    }
+  }
+
+  /// Check if property is favorite
+  bool isFavorite(String propertyId) {
+    return _favoriteIds.contains(propertyId);
+  }
+
+  /// Create property via API
+  Future<bool> createProperty(Property property) async {
+    try {
+      final response = await ApiClient.createProperty(property.toJson());
+      if (response['success'] == true) {
+        final newProperty = Property.fromJson(response['data']);
+        _properties.insert(0, newProperty);
+        _applyFilters();
+        return true;
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+    return false;
+  }
+
+  /// Update property via API
+  Future<bool> updateProperty(String id, Map<String, dynamic> updates) async {
+    try {
+      final response = await ApiClient.updateProperty(id, updates);
+      if (response['success'] == true) {
+        final index = _properties.indexWhere((p) => p.id == id);
+        if (index != -1) {
+          _properties[index] = Property.fromJson(response['data']);
+          _applyFilters();
+        }
+        return true;
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+    return false;
+  }
+
+  /// Delete property via API
+  Future<bool> deleteProperty(String id) async {
+    try {
+      final response = await ApiClient.deleteProperty(id);
+      if (response['success'] == true) {
+        _properties.removeWhere((p) => p.id == id);
+        _applyFilters();
+        return true;
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+    return false;
+  }
+
+  /// Fallback sample properties when API fails
   void _loadSampleProperties() {
-    // Sample properties for Lucknow
     _properties = [
       Property(
         id: '1',
         title: '3 BHK Luxury Apartment in Gomti Nagar',
-        description: 'Spacious 3 BHK apartment with modern amenities in the heart of Gomti Nagar. Premium location with easy access to malls, schools, and hospitals.',
+        description: 'Spacious 3 BHK apartment with modern amenities in the heart of Gomti Nagar.',
         price: 8500000,
         propertyType: 'Apartment',
         transactionType: 'Buy',
@@ -44,25 +211,20 @@ class PropertyProvider with ChangeNotifier {
         size: 1850,
         bedrooms: 3,
         bathrooms: 3,
-        images: [
-          'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800',
-          'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800',
-        ],
+        images: ['https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800'],
         ownerId: '1',
         ownerName: 'Rajesh Kumar',
         ownerPhone: '+91 9876543210',
-        amenities: ['Swimming Pool', 'Gym', 'Parking', 'Security', 'Power Backup', 'Lift'],
+        amenities: ['Swimming Pool', 'Gym', 'Parking', 'Security'],
         isFurnished: true,
         yearBuilt: 2020,
         listedDate: DateTime.now().subtract(const Duration(days: 5)),
         isFeatured: true,
-        latitude: 26.8467,
-        longitude: 80.9462,
       ),
       Property(
         id: '2',
         title: '2 BHK Flat for Rent in Hazratganj',
-        description: 'Well-maintained 2 BHK flat in prime Hazratganj area. Perfect for families and professionals.',
+        description: 'Well-maintained 2 BHK flat in prime Hazratganj area.',
         price: 25000,
         propertyType: 'Apartment',
         transactionType: 'Rent',
@@ -71,10 +233,7 @@ class PropertyProvider with ChangeNotifier {
         size: 1200,
         bedrooms: 2,
         bathrooms: 2,
-        images: [
-          'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
-          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
-        ],
+        images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
         ownerId: '2',
         ownerName: 'Priya Sharma',
         ownerPhone: '+91 9876543211',
@@ -83,13 +242,11 @@ class PropertyProvider with ChangeNotifier {
         yearBuilt: 2018,
         listedDate: DateTime.now().subtract(const Duration(days: 2)),
         isFeatured: true,
-        latitude: 26.8467,
-        longitude: 80.9462,
       ),
       Property(
         id: '3',
         title: 'Independent House in Aliganj',
-        description: 'Beautiful 4 BHK independent house with garden and parking. Ideal for large families.',
+        description: 'Beautiful 4 BHK independent house with garden and parking.',
         price: 12000000,
         propertyType: 'House',
         transactionType: 'Buy',
@@ -98,104 +255,18 @@ class PropertyProvider with ChangeNotifier {
         size: 2500,
         bedrooms: 4,
         bathrooms: 4,
-        images: [
-          'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800',
-          'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800',
-        ],
+        images: ['https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800'],
         ownerId: '3',
         ownerName: 'Amit Singh',
         ownerPhone: '+91 9876543212',
-        amenities: ['Garden', 'Parking', 'Security', 'Power Backup'],
+        amenities: ['Garden', 'Parking', 'Security'],
         isFurnished: true,
         yearBuilt: 2019,
         listedDate: DateTime.now().subtract(const Duration(days: 10)),
         isFeatured: false,
-        latitude: 26.8467,
-        longitude: 80.9462,
-      ),
-      Property(
-        id: '4',
-        title: 'Commercial Space in Aminabad',
-        description: 'Prime commercial property in busy Aminabad market. Great for retail business.',
-        price: 150000,
-        propertyType: 'Commercial',
-        transactionType: 'Rent',
-        location: 'Aminabad, Lucknow',
-        area: 'Aminabad',
-        size: 800,
-        bedrooms: 0,
-        bathrooms: 2,
-        images: [
-          'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800',
-          'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=800',
-        ],
-        ownerId: '4',
-        ownerName: 'Mohit Verma',
-        ownerPhone: '+91 9876543213',
-        amenities: ['Parking', 'Security', 'Power Backup', 'Lift'],
-        isFurnished: false,
-        yearBuilt: 2015,
-        listedDate: DateTime.now().subtract(const Duration(days: 7)),
-        isFeatured: true,
-        latitude: 26.8467,
-        longitude: 80.9462,
-      ),
-      Property(
-        id: '5',
-        title: 'Plot for Sale in Indira Nagar',
-        description: 'Residential plot in well-developed Indira Nagar colony. Ready for construction.',
-        price: 5500000,
-        propertyType: 'Plot',
-        transactionType: 'Buy',
-        location: 'Indira Nagar, Lucknow',
-        area: 'Indira Nagar',
-        size: 1500,
-        bedrooms: 0,
-        bathrooms: 0,
-        images: [
-          'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800',
-        ],
-        ownerId: '5',
-        ownerName: 'Sunita Mishra',
-        ownerPhone: '+91 9876543214',
-        amenities: ['Road Access', 'Electricity', 'Water Supply'],
-        isFurnished: false,
-        yearBuilt: 2024,
-        listedDate: DateTime.now().subtract(const Duration(days: 1)),
-        isFeatured: false,
-        latitude: 26.8467,
-        longitude: 80.9462,
-      ),
-      Property(
-        id: '6',
-        title: 'Luxury Villa in Jankipuram',
-        description: 'Premium 5 BHK villa with all modern amenities. Private pool and garden.',
-        price: 25000000,
-        propertyType: 'House',
-        transactionType: 'Buy',
-        location: 'Jankipuram, Lucknow',
-        area: 'Jankipuram',
-        size: 4000,
-        bedrooms: 5,
-        bathrooms: 5,
-        images: [
-          'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800',
-          'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
-        ],
-        ownerId: '6',
-        ownerName: 'Vikram Kapoor',
-        ownerPhone: '+91 9876543215',
-        amenities: ['Swimming Pool', 'Garden', 'Gym', 'Parking', 'Security', 'Power Backup'],
-        isFurnished: true,
-        yearBuilt: 2022,
-        listedDate: DateTime.now().subtract(const Duration(days: 15)),
-        isFeatured: true,
-        latitude: 26.8467,
-        longitude: 80.9462,
       ),
     ];
     _filteredProperties = List.from(_properties);
-    notifyListeners();
   }
 
   void searchProperties(String query) {
@@ -331,6 +402,11 @@ class PropertyProvider with ChangeNotifier {
 
   void addProperty(Property property) {
     _properties.insert(0, property);
+    _applyFilters();
+  }
+
+  void removeProperty(String id) {
+    _properties.removeWhere((p) => p.id == id);
     _applyFilters();
   }
 }

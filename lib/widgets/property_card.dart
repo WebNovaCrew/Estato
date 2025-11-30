@@ -171,7 +171,7 @@ class PropertyCard extends StatelessWidget {
                   // Location
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 16, color: AppColors.secondary),
+                      const Icon(Icons.location_on, size: 16, color: AppColors.locationPin),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -189,16 +189,14 @@ class PropertyCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   
                   // Property Info
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
-                      if (property.bedrooms > 0) ...[
+                      if (property.bedrooms > 0)
                         _buildInfoChip(Icons.bed, '${property.bedrooms} Bed'),
-                        const SizedBox(width: 8),
-                      ],
-                      if (property.bathrooms > 0) ...[
+                      if (property.bathrooms > 0)
                         _buildInfoChip(Icons.bathtub, '${property.bathrooms} Bath'),
-                        const SizedBox(width: 8),
-                      ],
                       _buildInfoChip(Icons.square_foot, '${property.size.toInt()} sqft'),
                     ],
                   ),
@@ -208,39 +206,46 @@ class PropertyCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatPrice(property.price),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _formatPrice(property.price),
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (property.transactionType == 'Rent')
+                              Text(
+                                'per month',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            property.propertyType,
                             style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                               color: AppColors.primary,
                             ),
-                          ),
-                          if (property.transactionType == 'Rent')
-                            Text(
-                              'per month',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          property.propertyType,
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),

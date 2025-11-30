@@ -119,7 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       });
 
       try {
-        await Provider.of<AuthProvider>(context, listen: false).register(
+        final success = await Provider.of<AuthProvider>(context, listen: false).register(
           _nameController.text,
           _emailController.text,
           _phoneController.text,
@@ -128,7 +128,20 @@ class _RegisterScreenState extends State<RegisterScreen>
         );
         
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/home');
+          if (success) {
+            Navigator.of(context).pushReplacementNamed('/home');
+          } else {
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  authProvider.errorMessage ?? 'Registration failed',
+                  style: GoogleFonts.poppins(),
+                ),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -175,36 +188,30 @@ class _RegisterScreenState extends State<RegisterScreen>
                   children: [
                     const SizedBox(height: 20),
                     
-                    // Animated Logo with gradient
+                    // Animated Logo
                     FadeTransition(
                       opacity: _fadeAnimation,
                       child: ScaleTransition(
                         scale: _logoScaleAnimation,
-                        child: RotationTransition(
-                          turns: _logoRotationAnimation,
-                          child: Center(
-                            child: Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: AppColors.primaryGradient,
+                        child: Center(
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
                                 ),
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.home_rounded,
-                                size: 50,
-                                color: Colors.white,
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.asset(
+                                'assets/icons/Estato Logo.png',
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),

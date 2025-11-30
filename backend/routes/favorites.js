@@ -50,6 +50,15 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(propertyId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid property ID format. Property must be from the database.',
+      });
+    }
+
     const result = await addFavorite(req.userId, propertyId);
 
     if (!result.success) {

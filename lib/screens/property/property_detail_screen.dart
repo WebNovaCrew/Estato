@@ -46,6 +46,27 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
   }
 
+  Future<void> _openWhatsApp(String phoneNumber) async {
+    // Clean phone number and add country code if needed
+    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    if (!cleanNumber.startsWith('+')) {
+      cleanNumber = '+91$cleanNumber'; // Default to India
+    }
+    
+    final message = 'Hi, I am interested in the property: ${widget.property.title} at ${widget.property.location}. Please share more details.';
+    final uri = Uri.parse('https://wa.me/${cleanNumber.replaceAll('+', '')}?text=${Uri.encodeComponent(message)}');
+    
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open WhatsApp')),
+        );
+      }
+    }
+  }
+
   void _startChat(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -529,11 +550,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _startChat(context),
+                onPressed: () => _openWhatsApp(widget.property.ownerPhone),
                 icon: const Icon(Icons.chat),
-                label: const Text('Chat'),
+                label: const Text('WhatsApp'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.info,
+                  backgroundColor: const Color(0xFF25D366),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),

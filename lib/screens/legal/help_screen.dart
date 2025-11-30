@@ -21,11 +21,36 @@ class HelpScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Frequently Asked Questions',
+              'Madad Chahiye?',
               style: GoogleFonts.poppins(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Hum yahan hain aapki seva mein! 🙏',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Aksar Pooche Jaane Wale Sawaal',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 32),
@@ -63,10 +88,48 @@ class HelpScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary.withOpacity(0.1), AppColors.secondary.withOpacity(0.1)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_city, color: AppColors.primary, size: 32),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Lucknow Office',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Text(
+                          'Gomti Nagar, Lucknow - 226010',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             _buildContactOption(
               icon: Icons.email_outlined,
               title: 'Email Support',
-              subtitle: 'support@estato.com',
+              subtitle: 'support@estato.lucknow.in',
               onTap: () async {
                 final Uri emailUri = Uri(
                   scheme: 'mailto',

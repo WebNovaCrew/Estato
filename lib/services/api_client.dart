@@ -1,10 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/user.dart';
-import '../models/property.dart';
-import '../models/booking.dart';
-import '../models/message.dart';
 import 'config_service.dart';
 
 /// API Client for backend communication
@@ -17,19 +13,20 @@ class ApiClient {
   // Get stored access token
   static Future<String?> _getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
+    final token = prefs.getString('accessToken');
+    return token;
   }
 
   // Save access token
   static Future<void> _saveAccessToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', token);
+    await prefs.setString('accessToken', token);
   }
 
   // Clear access token
   static Future<void> _clearAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
+    await prefs.remove('accessToken');
   }
 
   // Make authenticated request
@@ -42,6 +39,7 @@ class ApiClient {
   }) async {
     try {
       final url = Uri.parse('$baseUrl$endpoint');
+      
       final requestHeaders = <String, String>{
         'Content-Type': 'application/json',
         ...?headers,
@@ -62,13 +60,17 @@ class ApiClient {
 
       switch (method.toUpperCase()) {
         case 'GET':
-          response = await http.get(url, headers: requestHeaders);
+          response = await http.get(url, headers: requestHeaders).timeout(
+            const Duration(seconds: 30),
+          );
           break;
         case 'POST':
           response = await http.post(
             url,
             headers: requestHeaders,
             body: body != null ? json.encode(body) : null,
+          ).timeout(
+            const Duration(seconds: 30),
           );
           break;
         case 'PUT':
@@ -98,9 +100,23 @@ class ApiClient {
 
       return responseData;
     } catch (e) {
+      String errorMessage = 'Network error';
+      
+      if (e.toString().contains('TimeoutException')) {
+        errorMessage = 'Request timeout. Please check your internet connection.';
+      } else if (e.toString().contains('SocketException')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection.';
+      } else if (e.toString().contains('HandshakeException')) {
+        errorMessage = 'SSL/TLS connection failed. Please try again.';
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = 'Invalid response from server.';
+      } else {
+        errorMessage = 'Network error: ${e.toString()}';
+      }
+      
       return {
         'success': false,
-        'error': 'Network error: ${e.toString()}',
+        'error': errorMessage,
       };
     }
   }
@@ -121,15 +137,24 @@ class ApiClient {
         'password': password,
         'name': name,
         'phone': phone,
-        'userType': userType,
+        'userType': userType.toLowerCase(), // Valid: buyer, seller, agent, landlord, owner, both
       },
       requireAuth: false,
     );
 
     if (response['success'] == true && response['data'] != null) {
-      final session = response['data']['session'];
-      if (session != null && session['access_token'] != null) {
-        await _saveAccessToken(session['access_token']);
+      // Handle both session and direct token response formats
+      final data = response['data'];
+      String? accessToken;
+      
+      if (data['session'] != null && data['session']['access_token'] != null) {
+        accessToken = data['session']['access_token'];
+      } else if (data['accessToken'] != null) {
+        accessToken = data['accessToken'];
+      }
+      
+      if (accessToken != null) {
+        await _saveAccessToken(accessToken);
       }
     }
 
@@ -258,12 +283,47 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> uploadAvatar(String imagePath) async {
-    // TODO: Implement file upload using multipart request
-    // This requires additional implementation
-    return {
-      'success': false,
-      'error': 'Avatar upload not yet implemented',
-    };
+    try {
+      final token = await _getAccessToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'error': 'Not authenticated. Please login.',
+        };
+      }
+
+      final url = Uri.parse('$baseUrl/users/avatar');
+      final request = http.MultipartRequest('POST', url);
+      
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+      
+      // Add the file
+      final file = await http.MultipartFile.fromPath('avatar', imagePath);
+      request.files.add(file);
+      
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60),
+      );
+      
+      final response = await http.Response.fromStream(streamedResponse);
+      final responseData = json.decode(response.body) as Map<String, dynamic>;
+      
+      if (response.statusCode == 401) {
+        await _clearAccessToken();
+        return {
+          'success': false,
+          'error': 'Session expired. Please login again.',
+        };
+      }
+      
+      return responseData;
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Failed to upload avatar. Please try again.',
+      };
+    }
   }
 
   static Future<Map<String, dynamic>> changePassword({
@@ -278,6 +338,14 @@ class ApiClient {
         'newPassword': newPassword,
       },
     );
+  }
+
+  static Future<Map<String, dynamic>> deleteAccount() async {
+    final response = await _makeRequest('DELETE', '/users/profile');
+    if (response['success'] == true) {
+      await _clearAccessToken();
+    }
+    return response;
   }
 
   // Property Methods
@@ -313,8 +381,117 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> createProperty(Map<String, dynamic> propertyData) async {
-    // TODO: Implement multipart form data for image upload
-    return await _makeRequest('POST', '/properties', body: propertyData);
+    try {
+      final token = await _getAccessToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'error': 'Not authenticated. Please login.',
+        };
+      }
+
+      final url = Uri.parse('$baseUrl/properties');
+      final request = http.MultipartRequest('POST', url);
+
+      // Add authorization header
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add text fields
+      if (propertyData['title'] != null) {
+        request.fields['title'] = propertyData['title'];
+      }
+      if (propertyData['description'] != null) {
+        request.fields['description'] = propertyData['description'];
+      }
+      if (propertyData['price'] != null) {
+        request.fields['price'] = propertyData['price'].toString();
+      }
+      if (propertyData['propertyType'] != null) {
+        request.fields['propertyType'] = propertyData['propertyType'];
+      }
+      if (propertyData['transactionType'] != null) {
+        request.fields['transactionType'] = propertyData['transactionType'];
+      }
+      if (propertyData['location'] != null) {
+        request.fields['location'] = propertyData['location'];
+      }
+      if (propertyData['area'] != null) {
+        request.fields['area'] = propertyData['area'];
+      }
+      if (propertyData['size'] != null) {
+        request.fields['size'] = propertyData['size'].toString();
+      }
+      if (propertyData['bedrooms'] != null) {
+        request.fields['bedrooms'] = propertyData['bedrooms'].toString();
+      }
+      if (propertyData['bathrooms'] != null) {
+        request.fields['bathrooms'] = propertyData['bathrooms'].toString();
+      }
+      if (propertyData['ownerPhone'] != null) {
+        request.fields['ownerPhone'] = propertyData['ownerPhone'];
+      }
+      if (propertyData['isFurnished'] != null) {
+        request.fields['isFurnished'] = propertyData['isFurnished'].toString();
+      }
+      if (propertyData['yearBuilt'] != null) {
+        request.fields['yearBuilt'] = propertyData['yearBuilt'].toString();
+      }
+      if (propertyData['latitude'] != null) {
+        request.fields['latitude'] = propertyData['latitude'].toString();
+      }
+      if (propertyData['longitude'] != null) {
+        request.fields['longitude'] = propertyData['longitude'].toString();
+      }
+      if (propertyData['isFeatured'] != null) {
+        request.fields['isFeatured'] = propertyData['isFeatured'].toString();
+      }
+      if (propertyData['amenities'] != null && propertyData['amenities'] is List) {
+        request.fields['amenities'] = json.encode(propertyData['amenities']);
+      }
+
+      // Add image files
+      if (propertyData['images'] != null && propertyData['images'] is List) {
+        final images = propertyData['images'] as List;
+        for (int i = 0; i < images.length && i < 10; i++) {
+          final imagePath = images[i];
+          if (imagePath is String && imagePath.isNotEmpty) {
+            // Check if it's a file path (local file) or URL (already uploaded)
+            if (!imagePath.startsWith('http')) {
+              // It's a local file path, add as multipart file
+              try {
+                final file = await http.MultipartFile.fromPath('images', imagePath);
+                request.files.add(file);
+              } catch (e) {
+                // Skip invalid files
+                continue;
+              }
+            }
+          }
+        }
+      }
+
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60),
+      );
+
+      final response = await http.Response.fromStream(streamedResponse);
+      final responseData = json.decode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 401) {
+        await _clearAccessToken();
+        return {
+          'success': false,
+          'error': 'Session expired. Please login again.',
+        };
+      }
+
+      return responseData;
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Failed to create property. Please try again.',
+      };
+    }
   }
 
   static Future<Map<String, dynamic>> updateProperty(String id, Map<String, dynamic> updates) async {
@@ -391,33 +568,6 @@ class ApiClient {
     return await _makeRequest('PUT', '/bookings/$id', body: {'status': status});
   }
 
-  // Payment Methods
-  static Future<Map<String, dynamic>> createPayment({
-    required double amount,
-    required String planName,
-  }) async {
-    return await _makeRequest('POST', '/payments/create', body: {
-      'amount': amount,
-      'planName': planName,
-    });
-  }
-
-  static Future<Map<String, dynamic>> verifyPayment({
-    required String orderId,
-    required String paymentId,
-    required String signature,
-  }) async {
-    return await _makeRequest('POST', '/payments/verify', body: {
-      'orderId': orderId,
-      'paymentId': paymentId,
-      'signature': signature,
-    });
-  }
-
-  static Future<Map<String, dynamic>> getPaymentHistory() async {
-    return await _makeRequest('GET', '/payments/history');
-  }
-
   // Admin Methods
   static Future<Map<String, dynamic>> getAdminDashboard() async {
     return await _makeRequest('GET', '/admin/dashboard');
@@ -454,6 +604,50 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> resolveReport(String id) async {
     return await _makeRequest('PUT', '/admin/reports/$id/resolve');
+  }
+
+  // Authentication - Password Reset Methods
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    return await _makeRequest(
+      'POST',
+      '/auth/forgot-password',
+      body: {'email': email},
+      requireAuth: false,
+    );
+  }
+
+  static Future<Map<String, dynamic>> resetPassword({
+    required String password,
+    required String token,
+  }) async {
+    return await _makeRequest(
+      'POST',
+      '/auth/reset-password',
+      body: {
+        'password': password,
+        'token': token,
+      },
+      requireAuth: false,
+    );
+  }
+
+  // Notification Methods
+  static Future<Map<String, dynamic>> getNotifications() async {
+    return await _makeRequest('GET', '/notifications');
+  }
+
+  static Future<Map<String, dynamic>> markNotificationRead(String id) async {
+    return await _makeRequest('PUT', '/notifications/$id/read');
+  }
+
+  static Future<Map<String, dynamic>> updateNotificationSettings(
+    Map<String, dynamic> settings,
+  ) async {
+    return await _makeRequest(
+      'PUT',
+      '/notifications/settings',
+      body: settings,
+    );
   }
 }
 
