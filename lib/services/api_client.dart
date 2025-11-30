@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config_service.dart';
 
@@ -459,10 +460,28 @@ class ApiClient {
             if (!imagePath.startsWith('http')) {
               // It's a local file path, add as multipart file
               try {
-                final file = await http.MultipartFile.fromPath('images', imagePath);
+                // Determine content type from file extension
+                String contentType = 'image/jpeg'; // default
+                final lowerPath = imagePath.toLowerCase();
+                if (lowerPath.endsWith('.png')) {
+                  contentType = 'image/png';
+                } else if (lowerPath.endsWith('.gif')) {
+                  contentType = 'image/gif';
+                } else if (lowerPath.endsWith('.webp')) {
+                  contentType = 'image/webp';
+                } else if (lowerPath.endsWith('.heic') || lowerPath.endsWith('.heif')) {
+                  contentType = 'image/heic';
+                }
+                
+                final file = await http.MultipartFile.fromPath(
+                  'images', 
+                  imagePath,
+                  contentType: MediaType.parse(contentType),
+                );
                 request.files.add(file);
               } catch (e) {
                 // Skip invalid files
+                print('Error adding image file: $e');
                 continue;
               }
             }
