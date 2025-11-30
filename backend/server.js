@@ -98,10 +98,13 @@ app.use('/api/', limiter);
 
 // Health check route
 app.get('/health', (req, res) => {
+  const { supabaseAdmin } = require('./config/supabase');
   res.json({
     success: true,
     message: 'Estato API is running',
     timestamp: new Date().toISOString(),
+    adminClientEnabled: supabaseAdmin !== null,
+    serviceKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   });
 });
 
