@@ -15,8 +15,8 @@ import {
   Activity,
   RefreshCw
 } from 'lucide-react'
-import { apiClient } from '@/lib/api-client'
-import { toast } from 'sonner'
+import apiClient from '@/lib/api-client'
+import toast from 'react-hot-toast'
 
 export default function AdminAnalyticsPage() {
   const [timeRange, setTimeRange] = useState('30d')
