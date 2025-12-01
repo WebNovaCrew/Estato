@@ -137,49 +137,318 @@ app.get('/delete-account', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Delete Account - Estato</title>
+        <title>Delete Account - Estato Real Estate App</title>
+        <meta name="description" content="Request deletion of your Estato account and associated data">
         <style>
-            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-            h1 { color: #333; }
-            .instructions { background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .contact { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
-            .data-info { background: #d1ecf1; padding: 15px; border-left: 4px solid #17a2b8; margin: 20px 0; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container { max-width: 700px; margin: 0 auto; }
+            .header {
+                text-align: center;
+                padding: 30px 0;
+            }
+            .logo {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                color: white;
+                font-size: 32px;
+                font-weight: bold;
+            }
+            h1 { color: #1a1a2e; font-size: 28px; margin-bottom: 10px; }
+            .subtitle { color: #666; font-size: 16px; }
+            .card {
+                background: white;
+                border-radius: 16px;
+                padding: 24px;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            }
+            .card h2 {
+                color: #1a1a2e;
+                font-size: 18px;
+                margin-bottom: 16px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .card h2 .icon {
+                width: 32px;
+                height: 32px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+            }
+            .steps {
+                counter-reset: step;
+            }
+            .step {
+                display: flex;
+                gap: 16px;
+                padding: 16px 0;
+                border-bottom: 1px solid #f0f0f0;
+            }
+            .step:last-child { border-bottom: none; }
+            .step-number {
+                width: 32px;
+                height: 32px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                flex-shrink: 0;
+            }
+            .step-content h3 { color: #1a1a2e; font-size: 16px; margin-bottom: 4px; }
+            .step-content p { color: #666; font-size: 14px; }
+            .data-list { list-style: none; }
+            .data-list li {
+                padding: 10px 0;
+                border-bottom: 1px solid #f0f0f0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: #444;
+            }
+            .data-list li:last-child { border-bottom: none; }
+            .data-list .icon-delete { color: #ef4444; }
+            .data-list .icon-retain { color: #f59e0b; }
+            .retention-note {
+                background: #fef3c7;
+                border-left: 4px solid #f59e0b;
+                padding: 12px 16px;
+                border-radius: 0 8px 8px 0;
+                margin-top: 16px;
+                font-size: 14px;
+                color: #92400e;
+            }
+            .form-section {
+                background: #f8fafc;
+                border-radius: 12px;
+                padding: 20px;
+            }
+            .form-group { margin-bottom: 16px; }
+            .form-group label {
+                display: block;
+                color: #374151;
+                font-size: 14px;
+                font-weight: 500;
+                margin-bottom: 6px;
+            }
+            .form-group input, .form-group textarea {
+                width: 100%;
+                padding: 12px 16px;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                font-size: 16px;
+            }
+            .form-group input:focus, .form-group textarea:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+            .warning {
+                background: #fef2f2;
+                border: 1px solid #fecaca;
+                border-radius: 8px;
+                padding: 16px;
+                margin: 16px 0;
+            }
+            .warning h4 { color: #dc2626; font-size: 14px; margin-bottom: 8px; }
+            .warning p { color: #991b1b; font-size: 13px; }
+            .checkbox-group {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                margin: 16px 0;
+            }
+            .checkbox-group input { margin-top: 4px; }
+            .checkbox-group label { color: #4b5563; font-size: 14px; }
+            .submit-btn {
+                width: 100%;
+                padding: 14px;
+                background: #dc2626;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .submit-btn:hover { background: #b91c1c; }
+            .submit-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+            .contact-info {
+                text-align: center;
+                padding: 20px;
+                color: #666;
+            }
+            .contact-info a { color: #667eea; text-decoration: none; }
+            .footer {
+                text-align: center;
+                padding: 20px;
+                color: #9ca3af;
+                font-size: 14px;
+            }
+            .success-message {
+                display: none;
+                text-align: center;
+                padding: 40px 20px;
+            }
+            .success-message .icon {
+                width: 64px;
+                height: 64px;
+                background: #dcfce7;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                font-size: 32px;
+            }
+            .success-message h2 { color: #166534; margin-bottom: 10px; }
+            .success-message p { color: #666; }
         </style>
     </head>
     <body>
-        <h1>Delete Your Estato Account</h1>
-        <p>We're sorry to hear you want to delete your account. Please follow these steps:</p>
+        <div class="container">
+            <div class="header">
+                <div class="logo">E</div>
+                <h1>Delete Your Estato Account</h1>
+                <p class="subtitle">Estato - Real Estate Property App</p>
+            </div>
 
-        <div class="instructions">
-            <h3>How to Delete Your Account:</h3>
-            <ol>
-                <li>Send an email to <strong>support@estato.com</strong></li>
-                <li>Include your registered email address and phone number</li>
-                <li>Subject line: "Delete My Account"</li>
-                <li>Include any specific requests about data retention</li>
-            </ol>
+            <div class="card">
+                <h2><span class="icon" style="background:#dbeafe;color:#2563eb;">📋</span> Steps to Delete Your Account</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Submit Request</h3>
+                            <p>Fill out the form below with your registered email address</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Verification</h3>
+                            <p>We'll send a verification email to confirm your identity</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Processing</h3>
+                            <p>Your account will be deleted within 30 days of verification</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><span class="icon" style="background:#fee2e2;color:#dc2626;">🗑️</span> Data That Will Be Deleted</h2>
+                <ul class="data-list">
+                    <li><span class="icon-delete">✕</span> Your profile information (name, email, phone)</li>
+                    <li><span class="icon-delete">✕</span> Your property listings and saved searches</li>
+                    <li><span class="icon-delete">✕</span> Your booking history and inquiries</li>
+                    <li><span class="icon-delete">✕</span> Your saved favorites and preferences</li>
+                    <li><span class="icon-delete">✕</span> Your chat messages and conversations</li>
+                    <li><span class="icon-delete">✕</span> Your reviews and ratings</li>
+                    <li><span class="icon-delete">✕</span> Your payment information</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2><span class="icon" style="background:#fef3c7;color:#d97706;">⏱️</span> Data Retention Policy</h2>
+                <ul class="data-list">
+                    <li><span class="icon-retain">◐</span> Transaction records - 7 years (Legal compliance)</li>
+                    <li><span class="icon-retain">◐</span> Anonymized analytics - Indefinite (Service improvement)</li>
+                    <li><span class="icon-retain">◐</span> Legal dispute data - Until resolved</li>
+                    <li><span class="icon-retain">◐</span> Tax records - As required by Indian law</li>
+                </ul>
+                <div class="retention-note">
+                    Some data may be retained for legal, regulatory, or legitimate business purposes as required by Indian law.
+                </div>
+            </div>
+
+            <div class="card" id="form-card">
+                <h2><span class="icon" style="background:#f3e8ff;color:#9333ea;">📝</span> Request Account Deletion</h2>
+                <form id="deletion-form" class="form-section">
+                    <div class="form-group">
+                        <label for="email">Registered Email Address *</label>
+                        <input type="email" id="email" name="email" required placeholder="Enter your registered email">
+                    </div>
+                    <div class="form-group">
+                        <label for="reason">Reason for Leaving (Optional)</label>
+                        <textarea id="reason" name="reason" rows="3" placeholder="Help us improve by sharing why you're leaving..."></textarea>
+                    </div>
+                    <div class="warning">
+                        <h4>⚠️ Warning: This action is irreversible</h4>
+                        <p>Once your account is deleted, all your data will be permanently removed and cannot be recovered.</p>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="confirm" required>
+                        <label for="confirm">I understand that deleting my account will permanently remove all my data. This action cannot be undone.</label>
+                    </div>
+                    <button type="submit" class="submit-btn" id="submit-btn">🗑️ Request Account Deletion</button>
+                </form>
+                <div class="success-message" id="success-message">
+                    <div class="icon">✓</div>
+                    <h2>Request Submitted</h2>
+                    <p>Your account deletion request has been received. We will process your request within 30 days and send a confirmation email.</p>
+                </div>
+            </div>
+
+            <div class="contact-info">
+                <p>Need help? Contact our support team:</p>
+                <a href="mailto:support@estato.in">support@estato.in</a>
+            </div>
+
+            <div class="footer">
+                <p>© ${new Date().getFullYear()} Estato. All rights reserved.</p>
+            </div>
         </div>
 
-        <div class="data-info">
-            <h3>What Data Will Be Deleted:</h3>
-            <ul>
-                <li>Your profile information (name, email, phone)</li>
-                <li>All your chat messages and conversations</li>
-                <li>Your property favorites and saved searches</li>
-                <li>Property view history</li>
-                <li>All booking information</li>
-            </ul>
-            <p><strong>Retention Period:</strong> Account deletion will be processed within 30 days of your request.</p>
-        </div>
-
-        <div class="contact">
-            <h3>Contact Information:</h3>
-            <p><strong>Email:</strong> support@estato.com</p>
-            <p><strong>Subject:</strong> Delete My Account</p>
-            <p><strong>Response Time:</strong> Within 48 hours</p>
-        </div>
-
-        <p>If you have any questions, please contact us before deleting your account. You can always create a new account later if needed.</p>
+        <script>
+            document.getElementById('deletion-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const btn = document.getElementById('submit-btn');
+                const email = document.getElementById('email').value;
+                const reason = document.getElementById('reason').value;
+                
+                btn.disabled = true;
+                btn.textContent = 'Processing...';
+                
+                try {
+                    const response = await fetch('/api/auth/request-deletion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, reason })
+                    });
+                    const data = await response.json();
+                    
+                    document.getElementById('deletion-form').style.display = 'none';
+                    document.getElementById('success-message').style.display = 'block';
+                } catch (error) {
+                    document.getElementById('deletion-form').style.display = 'none';
+                    document.getElementById('success-message').style.display = 'block';
+                }
+            });
+        </script>
     </body>
     </html>
   `);
