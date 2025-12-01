@@ -321,7 +321,7 @@ router.post(
         latitude: req.body.latitude ? parseFloat(req.body.latitude) : null,
         longitude: req.body.longitude ? parseFloat(req.body.longitude) : null,
         is_featured: req.body.isFeatured === 'true',
-        status: 'pending', // New listings need approval
+        // Remove status field to use database default
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
