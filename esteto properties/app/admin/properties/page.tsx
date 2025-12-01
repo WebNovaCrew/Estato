@@ -531,9 +531,19 @@ export default function AdminPropertiesPage() {
                         </>
                       )}
                       <button 
-                        onClick={() => {
+                        onClick={async () => {
                           if (confirm('Delete this property?')) {
-                            handleBulkAction('delete')
+                            try {
+                              const response = await apiClient.deleteProperty(property.id);
+                              if (response.success) {
+                                setProperties(prev => prev.filter(p => p.id !== property.id));
+                                toast.success('Property deleted successfully');
+                              } else {
+                                toast.error(response.error || 'Failed to delete property');
+                              }
+                            } catch (error) {
+                              toast.error('Failed to delete property');
+                            }
                           }
                         }}
                         className="p-2 hover:bg-red-100 rounded-lg" 

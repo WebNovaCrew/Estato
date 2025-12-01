@@ -733,12 +733,15 @@ router.delete('/users/:id', authenticate, requireAdmin, async (req, res) => {
  */
 router.delete('/properties/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { error } = await supabase
+    const dbClient = getDbClient();
+    
+    const { error } = await dbClient
       .from('properties')
       .delete()
       .eq('id', req.params.id);
 
     if (error) {
+      console.error('Delete property error:', error);
       return res.status(400).json({
         success: false,
         error: error.message,
