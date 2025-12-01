@@ -29,8 +29,7 @@ import {
   Database,
   Key
 } from 'lucide-react'
-import { createSupabaseClient } from '@/lib/supabase/client'
-import { shouldUseMockData } from '@/lib/mock-api'
+import apiClient from '@/lib/api-client'
 import toast from 'react-hot-toast'
 
 const sidebarItems = [
@@ -64,74 +63,48 @@ export default function AdminLayout({
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [notificationCount, setNotificationCount] = useState(3)
-  const supabase = createSupabaseClient()
+
+  // Skip auth check for login page
+  const isLoginPage = pathname === '/admin/login'
 
   useEffect(() => {
-    checkAdmin()
-  }, [])
+    if (!isLoginPage) {
+      checkAdmin()
+    } else {
+      setLoading(false)
+    }
+  }, [pathname])
 
   const checkAdmin = async () => {
-    // Demo mode - allow access without authentication
-    if (shouldUseMockData()) {
-      setUser({ 
-        id: 'demo-admin', 
-        email: 'admin@estato.com',
-        full_name: 'Admin User',
-        role: 'admin'
-      })
-      setLoading(false)
-      return
-    }
-
-    if (!supabase) {
-      // Fallback to demo mode if Supabase client not available
-      setUser({ 
-        id: 'demo-admin', 
-        email: 'admin@estato.com',
-        full_name: 'Admin User',
-        role: 'admin'
-      })
-      setLoading(false)
+    // Check if we have a token
+    const token = apiClient.getToken()
+    
+    if (!token) {
+      // No token - redirect to login
+      router.push('/admin/login')
       return
     }
 
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
+      // Verify token with backend
+      const response = await apiClient.getMe()
       
-      // If no authenticated user, allow demo access
-      if (!authUser) {
-        setUser({ 
-          id: 'demo-admin', 
-          email: 'admin@estato.com',
-          full_name: 'Demo Admin',
-          role: 'admin'
+      if (response.success && response.data) {
+        setUser({
+          id: response.data.id,
+          email: response.data.email,
+          full_name: response.data.name || response.data.full_name || 'Admin',
+          role: response.data.role || 'admin'
         })
-        setLoading(false)
+      } else {
+        // Token invalid - redirect to login
+        apiClient.clearToken()
+        router.push('/admin/login')
         return
       }
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      // If user is not admin, still allow demo access for now
-      if (!userData || userData?.role !== 'admin') {
-        setUser({ 
-          id: 'demo-admin', 
-          email: 'admin@estato.com',
-          full_name: 'Demo Admin',
-          role: 'admin'
-        })
-        setLoading(false)
-        return
-      }
-
-      setUser(userData)
     } catch (error) {
       console.error('Admin check failed:', error)
-      // Fallback to demo mode on error
+      // On error, still allow access with demo mode
       setUser({ 
         id: 'demo-admin', 
         email: 'admin@estato.com',
@@ -143,12 +116,12 @@ export default function AdminLayout({
   }
 
   const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut()
-    }
+    apiClient.clearToken()
     localStorage.removeItem('access_token')
     localStorage.removeItem('user_data')
-    router.push('/')
+    localStorage.removeItem('admin_token')
+    toast.success('Logged out successfully')
+    router.push('/admin/login')
   }
 
   if (loading) {
@@ -157,6 +130,11 @@ export default function AdminLayout({
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     )
+  }
+
+  // Render login page without sidebar
+  if (isLoginPage) {
+    return <>{children}</>
   }
 
   return (

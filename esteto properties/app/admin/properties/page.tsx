@@ -64,7 +64,7 @@ export default function AdminPropertiesPage() {
           title: p.title,
           description: p.description,
           type: p.property_type || 'flat',
-          listing_type: p.transaction_type === 'Buy' ? 'sale' : 'rent',
+          listing_type: (p.transaction_type === 'Buy' ? 'sale' : 'rent') as 'sale' | 'rent',
           price: p.price,
           location: p.location,
           city: p.area || 'Lucknow',
@@ -84,7 +84,7 @@ export default function AdminPropertiesPage() {
           created_at: p.created_at,
           updated_at: p.updated_at,
         }));
-        setProperties(mappedProperties);
+        setProperties(mappedProperties as Property[]);
       } else {
         toast.error(response.error || 'Failed to load properties');
       }

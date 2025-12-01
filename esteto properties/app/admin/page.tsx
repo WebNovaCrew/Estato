@@ -67,14 +67,14 @@ export default function AdminDashboardPage() {
         });
       }
 
-      if (propertiesResponse.success && propertiesResponse.data) {
+      if (propertiesResponse.success && propertiesResponse.data && Array.isArray(propertiesResponse.data)) {
         // Map backend property format to frontend format
-        const mappedProperties = propertiesResponse.data.map((p: any) => ({
+        const mappedProperties = (propertiesResponse.data as any[]).map((p: any) => ({
           id: p.id,
           title: p.title,
           description: p.description,
-          type: p.property_type,
-          listing_type: p.transaction_type === 'Buy' ? 'sale' : 'rent',
+          type: p.property_type || 'flat',
+          listing_type: (p.transaction_type === 'Buy' ? 'sale' : 'rent') as 'sale' | 'rent',
           price: p.price,
           location: p.location,
           city: p.area || 'Lucknow',
@@ -87,12 +87,13 @@ export default function AdminDashboardPage() {
           owner_id: p.owner_id,
           owner_name: p.owner_name,
           owner_phone: p.owner_phone,
+          owner_email: '',
           status: p.status || 'pending',
           admin_comment: p.admin_comment,
           featured: p.is_featured,
           created_at: p.created_at,
           updated_at: p.updated_at,
-        }));
+        })) as Property[];
         setRecentProperties(mappedProperties.slice(0, 10));
       }
 
