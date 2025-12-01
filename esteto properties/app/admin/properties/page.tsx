@@ -16,16 +16,16 @@ import {
   Building2,
   MoreVertical,
   Download,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react'
 import { Property } from '@/lib/supabase/types'
-import { createSupabaseClient } from '@/lib/supabase/client'
-import { shouldUseMockData, mockProperties } from '@/lib/mock-api'
+import apiClient from '@/lib/api-client'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
-type PropertyStatus = 'all' | 'pending' | 'approved' | 'rejected' | 'active' | 'sold' | 'rented'
+type PropertyStatus = 'all' | 'pending' | 'approved' | 'rejected' | 'needs_revision' | 'active' | 'sold' | 'rented'
 
 export default function AdminPropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([])
@@ -38,7 +38,6 @@ export default function AdminPropertiesPage() {
   const [selectedProperties, setSelectedProperties] = useState<string[]>([])
   const [showBulkActions, setShowBulkActions] = useState(false)
   const itemsPerPage = 10
-  const supabase = createSupabaseClient()
 
   useEffect(() => {
     fetchProperties()
@@ -55,46 +54,45 @@ export default function AdminPropertiesPage() {
   const fetchProperties = async () => {
     setLoading(true)
     
-    if (shouldUseMockData()) {
-      // Add more mock properties with different statuses
-      const extendedMockProperties = [
-        ...mockProperties,
-        ...mockProperties.map((p, i) => ({
-          ...p,
-          id: `pending-${i}`,
-          title: `Pending: ${p.title}`,
-          status: 'pending' as const,
-        })),
-        ...mockProperties.slice(0, 3).map((p, i) => ({
-          ...p,
-          id: `rejected-${i}`,
-          title: `Rejected: ${p.title}`,
-          status: 'rejected' as const,
-        })),
-      ]
-      setProperties(extendedMockProperties as Property[])
-      setLoading(false)
-      return
-    }
-
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-
     try {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setProperties(data || [])
+      const response = await apiClient.getProperties();
+      
+      if (response.success && response.data && Array.isArray(response.data)) {
+        // Map backend property format to frontend format
+        const mappedProperties = (response.data as any[]).map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          type: p.property_type || 'flat',
+          listing_type: p.transaction_type === 'Buy' ? 'sale' : 'rent',
+          price: p.price,
+          location: p.location,
+          city: p.area || 'Lucknow',
+          area: p.area,
+          bedrooms: p.bedrooms,
+          bathrooms: p.bathrooms,
+          sqft: p.size,
+          images: p.images || [],
+          amenities: p.amenities || [],
+          owner_id: p.owner_id,
+          owner_name: p.owner_name,
+          owner_email: p.owner_email,
+          owner_phone: p.owner_phone,
+          status: p.status || 'pending',
+          admin_comment: p.admin_comment,
+          featured: p.is_featured,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+        }));
+        setProperties(mappedProperties);
+      } else {
+        toast.error(response.error || 'Failed to load properties');
+      }
     } catch (error) {
-      console.error('Failed to fetch properties:', error)
-      toast.error('Failed to load properties')
+      console.error('Failed to fetch properties:', error);
+      toast.error('Failed to load properties');
     }
-    setLoading(false)
+    setLoading(false);
   }
 
   const filterProperties = () => {
@@ -126,100 +124,90 @@ export default function AdminPropertiesPage() {
   }
 
   const handleStatusChange = async (propertyId: string, newStatus: string) => {
-    if (shouldUseMockData()) {
-      // Update local state for demo
-      setProperties(prev => prev.map(p => 
-        p.id === propertyId ? { ...p, status: newStatus as Property['status'] } : p
-      ))
-      toast.success(`Property ${newStatus}`)
-      return
-    }
+    try {
+      let response;
+      if (newStatus === 'approved') {
+        response = await apiClient.approveProperty(propertyId);
+      } else if (newStatus === 'rejected') {
+        response = await apiClient.rejectProperty(propertyId);
+      } else {
+        response = await apiClient.updatePropertyStatus(propertyId, newStatus);
+      }
 
-    if (!supabase) {
-      toast.error('Supabase not configured')
-      return
+      if (response.success) {
+        setProperties(prev => prev.map(p => 
+          p.id === propertyId ? { ...p, status: newStatus as Property['status'] } : p
+        ));
+        toast.success(`Property ${newStatus} successfully!`);
+      } else {
+        toast.error(response.error || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      toast.error('Failed to update status');
     }
+  }
+
+  const handleAddComment = async (propertyId: string) => {
+    const comment = prompt('Enter feedback/comment for the property owner:');
+    if (!comment) return;
 
     try {
-      const { error } = await supabase
-        .from('properties')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', propertyId)
-
-      if (error) throw error
-
-      setProperties(prev => prev.map(p => 
-        p.id === propertyId ? { ...p, status: newStatus as Property['status'] } : p
-      ))
-      toast.success(`Property ${newStatus}`)
+      const response = await apiClient.addPropertyComment(propertyId, comment, 'needs_revision');
+      if (response.success) {
+        toast.success('Comment added! Property marked for revision.');
+        fetchProperties();
+      } else {
+        toast.error(response.error || 'Failed to add comment');
+      }
     } catch (error) {
-      console.error('Failed to update status:', error)
-      toast.error('Failed to update status')
+      toast.error('Failed to add comment');
     }
   }
 
   const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
-    if (selectedProperties.length === 0) return
+    if (selectedProperties.length === 0) return;
 
     const actionMap = {
       approve: 'approved',
       reject: 'rejected',
       delete: 'deleted'
-    }
+    };
 
     if (action === 'delete') {
-      if (!confirm(`Are you sure you want to delete ${selectedProperties.length} properties?`)) return
+      if (!confirm(`Are you sure you want to delete ${selectedProperties.length} properties?`)) return;
       
-      if (shouldUseMockData()) {
-        setProperties(prev => prev.filter(p => !selectedProperties.includes(p.id)))
-        toast.success(`${selectedProperties.length} properties deleted`)
-        setSelectedProperties([])
-        return
-      }
-
-      // Actual delete logic for Supabase
       try {
-        const { error } = await supabase!
-          .from('properties')
-          .delete()
-          .in('id', selectedProperties)
-
-        if (error) throw error
-        setProperties(prev => prev.filter(p => !selectedProperties.includes(p.id)))
-        toast.success(`${selectedProperties.length} properties deleted`)
+        // Delete each property
+        for (const id of selectedProperties) {
+          await apiClient.deleteProperty(id);
+        }
+        setProperties(prev => prev.filter(p => !selectedProperties.includes(p.id)));
+        toast.success(`${selectedProperties.length} properties deleted`);
       } catch (error) {
-        toast.error('Failed to delete properties')
+        toast.error('Failed to delete properties');
       }
     } else {
-      if (shouldUseMockData()) {
-        setProperties(prev => prev.map(p => 
-          selectedProperties.includes(p.id) 
-            ? { ...p, status: actionMap[action] as Property['status'] } 
-            : p
-        ))
-        toast.success(`${selectedProperties.length} properties ${actionMap[action]}`)
-        setSelectedProperties([])
-        return
-      }
-
       try {
-        const { error } = await supabase!
-          .from('properties')
-          .update({ status: actionMap[action], updated_at: new Date().toISOString() })
-          .in('id', selectedProperties)
-
-        if (error) throw error
+        // Update each property status
+        for (const id of selectedProperties) {
+          if (action === 'approve') {
+            await apiClient.approveProperty(id);
+          } else {
+            await apiClient.rejectProperty(id);
+          }
+        }
         setProperties(prev => prev.map(p => 
           selectedProperties.includes(p.id) 
             ? { ...p, status: actionMap[action] as Property['status'] } 
             : p
-        ))
-        toast.success(`${selectedProperties.length} properties ${actionMap[action]}`)
+        ));
+        toast.success(`${selectedProperties.length} properties ${actionMap[action]}`);
       } catch (error) {
-        toast.error(`Failed to ${action} properties`)
+        toast.error(`Failed to ${action} properties`);
       }
     }
-    setSelectedProperties([])
+    setSelectedProperties([]);
   }
 
   const handleSelectAll = () => {
@@ -519,6 +507,13 @@ export default function AdminPropertiesPage() {
                       </Link>
                       {property.status === 'pending' && (
                         <>
+                          <button 
+                            onClick={() => handleAddComment(property.id)}
+                            className="p-2 hover:bg-yellow-100 rounded-lg" 
+                            title="Add Comment"
+                          >
+                            <MessageSquare className="w-4 h-4 text-yellow-600" />
+                          </button>
                           <button 
                             onClick={() => handleStatusChange(property.id, 'approved')}
                             className="p-2 hover:bg-green-100 rounded-lg" 

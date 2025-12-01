@@ -16,11 +16,12 @@ import {
   Check,
   X,
   Building2,
-  Activity
+  Activity,
+  MessageSquare,
+  RefreshCw
 } from 'lucide-react'
 import { Property } from '@/lib/supabase/types'
-import { createSupabaseClient } from '@/lib/supabase/client'
-import { shouldUseMockData, mockProperties, mockUsers } from '@/lib/mock-api'
+import apiClient from '@/lib/api-client'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -39,113 +40,123 @@ export default function AdminDashboardPage() {
   const [recentProperties, setRecentProperties] = useState<Property[]>([])
   const [recentActivities, setRecentActivities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const supabase = createSupabaseClient()
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchDashboardData()
   }, [])
 
   const fetchDashboardData = async () => {
-    if (shouldUseMockData()) {
-      const activeListings = mockProperties.filter(p => p.status === 'active').length
-      const pendingListings = mockProperties.filter(p => p.status === 'pending').length
-      
-      setStats({
-        totalUsers: mockUsers.length + 25,
-        totalProperties: mockProperties.length + 15,
-        activeListings,
-        pendingListings: pendingListings + 8,
-        totalRevenue: 1250000,
-        pendingAgents: 5,
-        todayBookings: 12,
-        openReports: 3,
-      })
-
-      // Add pending properties for demo
-      const pendingProps = mockProperties.slice(0, 3).map((p, i) => ({
-        ...p,
-        id: `pending-${i}`,
-        status: 'pending' as const,
-        title: `Pending: ${p.title}`,
-      }))
-
-      setRecentProperties([...pendingProps, ...mockProperties.slice(0, 5)])
-      
-      setRecentActivities([
-        { id: 1, type: 'user', message: 'New user registered: Rahul Sharma', time: '5 min ago' },
-        { id: 2, type: 'property', message: 'New property listed: Luxury Villa in Gomti Nagar', time: '15 min ago' },
-        { id: 3, type: 'booking', message: 'New booking for 3BHK Apartment', time: '30 min ago' },
-        { id: 4, type: 'agent', message: 'Agent verification request: Priya Singh', time: '1 hour ago' },
-        { id: 5, type: 'report', message: 'New report submitted for property listing', time: '2 hours ago' },
-      ])
-      
-      setLoading(false)
-      return
-    }
-
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-
     try {
-      const [usersResult, propertiesResult, activeResult, pendingResult] = await Promise.all([
-        supabase.from('users').select('id', { count: 'exact', head: true }),
-        supabase.from('properties').select('id', { count: 'exact', head: true }),
-        supabase.from('properties').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('properties').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      ])
+      // Fetch stats from real backend
+      const [statsResponse, propertiesResponse] = await Promise.all([
+        apiClient.getDashboardStats(),
+        apiClient.getProperties(),
+      ]);
 
-      setStats({
-        totalUsers: usersResult.count || 0,
-        totalProperties: propertiesResult.count || 0,
-        activeListings: activeResult.count || 0,
-        pendingListings: pendingResult.count || 0,
-        totalRevenue: 0,
-        pendingAgents: 0,
-        todayBookings: 0,
-        openReports: 0,
-      })
+      if (statsResponse.success && statsResponse.data) {
+        setStats({
+          totalUsers: statsResponse.data.totalUsers || 0,
+          totalProperties: statsResponse.data.totalProperties || 0,
+          activeListings: statsResponse.data.activeProperties || 0,
+          pendingListings: statsResponse.data.pendingProperties || 0,
+          totalRevenue: statsResponse.data.totalRevenue || 0,
+          pendingAgents: statsResponse.data.pendingAgents || 0,
+          todayBookings: statsResponse.data.todayBookings || 0,
+          openReports: statsResponse.data.openReports || 0,
+        });
+      }
 
-      const { data: properties } = await supabase
-        .from('properties')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(8)
+      if (propertiesResponse.success && propertiesResponse.data) {
+        // Map backend property format to frontend format
+        const mappedProperties = propertiesResponse.data.map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          type: p.property_type,
+          listing_type: p.transaction_type === 'Buy' ? 'sale' : 'rent',
+          price: p.price,
+          location: p.location,
+          city: p.area || 'Lucknow',
+          area: p.area,
+          bedrooms: p.bedrooms,
+          bathrooms: p.bathrooms,
+          sqft: p.size,
+          images: p.images || [],
+          amenities: p.amenities || [],
+          owner_id: p.owner_id,
+          owner_name: p.owner_name,
+          owner_phone: p.owner_phone,
+          status: p.status || 'pending',
+          admin_comment: p.admin_comment,
+          featured: p.is_featured,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+        }));
+        setRecentProperties(mappedProperties.slice(0, 10));
+      }
 
-      setRecentProperties(properties || [])
+      // Set recent activities (could be fetched from backend in future)
+      setRecentActivities([
+        { id: 1, type: 'property', message: 'Dashboard data refreshed from live backend', time: 'Just now' },
+        { id: 2, type: 'user', message: `${stats.totalUsers} total users on platform`, time: 'Live' },
+        { id: 3, type: 'property', message: `${stats.pendingListings} properties awaiting approval`, time: 'Live' },
+      ]);
+
     } catch (error) {
-      console.warn('Failed to fetch dashboard data:', error)
+      console.error('Failed to fetch dashboard data:', error);
+      toast.error('Failed to load dashboard data');
     }
-    setLoading(false)
+    setLoading(false);
+    setRefreshing(false);
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    toast.success('Dashboard refreshed!');
   }
 
   const handleQuickAction = async (propertyId: string, action: 'approve' | 'reject') => {
-    if (shouldUseMockData()) {
-      setRecentProperties(prev => prev.map(p => 
-        p.id === propertyId 
-          ? { ...p, status: action === 'approve' ? 'active' : 'rejected' } as Property
-          : p
-      ))
-      toast.success(`Property ${action === 'approve' ? 'approved' : 'rejected'}`)
-      return
+    try {
+      let response;
+      if (action === 'approve') {
+        response = await apiClient.approveProperty(propertyId);
+      } else {
+        response = await apiClient.rejectProperty(propertyId);
+      }
+
+      if (response.success) {
+        const newStatus = action === 'approve' ? 'approved' : 'rejected';
+        setRecentProperties(prev => prev.map(p => 
+          p.id === propertyId ? { ...p, status: newStatus } as Property : p
+        ));
+        toast.success(`Property ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+        // Refresh stats
+        fetchDashboardData();
+      } else {
+        toast.error(response.error || 'Failed to update property');
+      }
+    } catch (error) {
+      console.error('Quick action error:', error);
+      toast.error('Failed to update property');
     }
+  }
+
+  const handleAddComment = async (propertyId: string) => {
+    const comment = prompt('Enter feedback/comment for the property owner:');
+    if (!comment) return;
 
     try {
-      const newStatus = action === 'approve' ? 'active' : 'rejected'
-      const { error } = await supabase!
-        .from('properties')
-        .update({ status: newStatus })
-        .eq('id', propertyId)
-
-      if (error) throw error
-      
-      setRecentProperties(prev => prev.map(p => 
-        p.id === propertyId ? { ...p, status: newStatus } as Property : p
-      ))
-      toast.success(`Property ${action === 'approve' ? 'approved' : 'rejected'}`)
+      const response = await apiClient.addPropertyComment(propertyId, comment, 'needs_revision');
+      if (response.success) {
+        toast.success('Comment added! Property marked for revision.');
+        fetchDashboardData();
+      } else {
+        toast.error(response.error || 'Failed to add comment');
+      }
     } catch (error) {
-      toast.error('Failed to update property')
+      toast.error('Failed to add comment');
     }
   }
 
@@ -162,9 +173,20 @@ export default function AdminDashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
-        <p className="text-gray-600 mt-1">Welcome back! Here's what's happening with your platform.</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+          <p className="text-gray-600 mt-1">Real-time data from your backend. Last updated: {new Date().toLocaleTimeString()}</p>
+        </div>
+        <Button 
+          onClick={handleRefresh} 
+          variant="outline" 
+          disabled={refreshing}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
       </div>
 
       {/* Stats Grid */}
@@ -316,23 +338,30 @@ export default function AdminDashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Link href={`/properties/${property.id}`}>
-                      <button className="p-2 hover:bg-gray-100 rounded-lg" title="View">
+                      <button className="p-2 hover:bg-gray-100 rounded-lg" title="View Property">
                         <Eye className="w-4 h-4 text-gray-600" />
                       </button>
                     </Link>
                     <button 
+                      onClick={() => handleAddComment(property.id)}
+                      className="p-2 hover:bg-yellow-100 rounded-lg" 
+                      title="Add Comment/Feedback"
+                    >
+                      <MessageSquare className="w-4 h-4 text-yellow-600" />
+                    </button>
+                    <button 
                       onClick={() => handleQuickAction(property.id, 'approve')}
                       className="p-2 hover:bg-green-100 rounded-lg" 
-                      title="Approve"
+                      title="Approve Property"
                     >
                       <Check className="w-4 h-4 text-green-600" />
                     </button>
                     <button 
                       onClick={() => handleQuickAction(property.id, 'reject')}
                       className="p-2 hover:bg-red-100 rounded-lg" 
-                      title="Reject"
+                      title="Reject Property"
                     >
                       <X className="w-4 h-4 text-red-600" />
                     </button>

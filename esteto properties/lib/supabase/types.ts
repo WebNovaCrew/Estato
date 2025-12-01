@@ -19,7 +19,8 @@ export interface Property {
   owner_name: string
   owner_email: string
   owner_phone: string
-  status: 'active' | 'pending' | 'sold' | 'rented'
+  status: 'active' | 'pending' | 'approved' | 'rejected' | 'needs_revision' | 'sold' | 'rented'
+  admin_comment?: string
   featured: boolean
   created_at: string
   updated_at: string
