@@ -329,7 +329,7 @@ app.get('/delete-account', (req, res) => {
             <div class="header">
                 <div class="logo">E</div>
                 <h1>Delete Your Estato Account</h1>
-                <p class="subtitle">Estato - Real Estate Property App</p>
+                <p class="subtitle">Estato by Web Nova Crew</p>
             </div>
 
             <div class="card">
@@ -415,11 +415,13 @@ app.get('/delete-account', (req, res) => {
 
             <div class="contact-info">
                 <p>Need help? Contact our support team:</p>
-                <a href="mailto:support@estato.in">support@estato.in</a>
+                <a href="mailto:support@estatoprop.com">support@estatoprop.com</a>
+                <p style="margin-top:8px;font-size:13px;">Developer Contact: <a href="mailto:Contact@webnovacrew.com">Contact@webnovacrew.com</a></p>
             </div>
 
             <div class="footer">
-                <p>© ${new Date().getFullYear()} Estato. All rights reserved.</p>
+                <p>© ${new Date().getFullYear()} Estato by Web Nova Crew. All rights reserved.</p>
+                <p style="margin-top:4px;font-size:12px;"><a href="https://estatoprop.com" style="color:#667eea;">estatoprop.com</a></p>
             </div>
         </div>
 

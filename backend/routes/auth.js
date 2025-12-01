@@ -554,8 +554,9 @@ router.get('/deletion-policy', (req, res) => {
     success: true,
     data: {
       appName: 'Estato',
-      developerName: 'Estato Technologies',
-      deletionUrl: 'https://estato.in/delete-account',
+      developerName: 'Web Nova Crew',
+      deletionUrl: 'https://champ-y6eg.onrender.com/delete-account',
+      websiteUrl: 'https://estatoprop.com',
       processingTime: '30 days',
       dataDeleted: [
         'Profile information (name, email, phone)',
@@ -572,7 +573,8 @@ router.get('/deletion-policy', (req, res) => {
         { type: 'Legal dispute data', period: 'Until resolved', reason: 'Legal requirements' },
         { type: 'Tax records', period: 'As required by law', reason: 'Regulatory compliance' },
       ],
-      contactEmail: 'support@estato.in',
+      supportEmail: 'support@estatoprop.com',
+      developerEmail: 'Contact@webnovacrew.com',
     },
   });
 });
