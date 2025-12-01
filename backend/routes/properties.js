@@ -2,13 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate, optionalAuth } = require('../middleware/auth');
-const {
-  getAllProperties,
-  getPropertyById,
-  createProperty,
-  updateProperty,
-  deleteProperty,
-} = require('../config/database');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { supabase, supabaseAdmin } = require('../config/supabase');
@@ -22,8 +15,6 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB per file
   },
-  // Remove strict file filter - accept all files and validate in route handler
-  // This prevents issues with mobile apps sending incorrect MIME types
 });
 
 // Error handling middleware for multer
@@ -32,7 +23,7 @@ const handleMulterError = (err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        error: 'File too large. Maximum size is 5MB.',
+        error: 'File too large. Maximum size is 10MB.',
       });
     }
     return res.status(400).json({
@@ -55,25 +46,42 @@ const handleMulterError = (err, req, res, next) => {
  */
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const filters = {
-      propertyType: req.query.propertyType,
-      transactionType: req.query.transactionType,
-      minPrice: req.query.minPrice ? parseFloat(req.query.minPrice) : null,
-      maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice) : null,
-      area: req.query.area,
-      search: req.query.search,
-    };
+    const dbClient = supabaseAdmin || supabase;
+    let query = dbClient.from('properties').select('*');
 
-    const result = await getAllProperties(filters);
+    if (req.query.propertyType) {
+      query = query.eq('property_type', req.query.propertyType);
+    }
+    if (req.query.transactionType) {
+      query = query.eq('transaction_type', req.query.transactionType);
+    }
+    if (req.query.minPrice) {
+      query = query.gte('price', parseFloat(req.query.minPrice));
+    }
+    if (req.query.maxPrice) {
+      query = query.lte('price', parseFloat(req.query.maxPrice));
+    }
+    if (req.query.area) {
+      query = query.eq('area', req.query.area);
+    }
+    if (req.query.search) {
+      query = query.or(`title.ilike.%${req.query.search}%,location.ilike.%${req.query.search}%,description.ilike.%${req.query.search}%`);
+    }
 
-    if (!result.success) {
-      return res.status(400).json(result);
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get properties error:', error);
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
     }
 
     res.json({
       success: true,
-      data: result.data,
-      count: result.data.length,
+      data: data || [],
+      count: data ? data.length : 0,
     });
   } catch (error) {
     console.error('Get properties error:', error);
@@ -91,7 +99,8 @@ router.get('/', optionalAuth, async (req, res) => {
  */
 router.get('/my-listings', authenticate, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const dbClient = supabaseAdmin || supabase;
+    const { data, error } = await dbClient
       .from('properties')
       .select('*')
       .eq('owner_id', req.userId)
@@ -126,11 +135,11 @@ router.get('/my-listings', authenticate, async (req, res) => {
  */
 router.get('/featured', optionalAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const dbClient = supabaseAdmin || supabase;
+    const { data, error } = await dbClient
       .from('properties')
       .select('*')
       .eq('is_featured', true)
-      .eq('status', 'approved')
       .limit(10);
 
     if (error) {
@@ -170,15 +179,29 @@ router.get('/:id', optionalAuth, async (req, res) => {
       });
     }
 
-    const result = await getPropertyById(req.params.id);
+    const dbClient = supabaseAdmin || supabase;
+    const { data, error } = await dbClient
+      .from('properties')
+      .select('*')
+      .eq('id', req.params.id);
 
-    if (!result.success) {
-      return res.status(404).json(result);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found',
+      });
     }
 
     res.json({
       success: true,
-      data: result.data,
+      data: data[0],
     });
   } catch (error) {
     console.error('Get property error:', error);
@@ -198,7 +221,6 @@ router.post(
   '/',
   authenticate,
   (req, res, next) => {
-    // Wrap multer to handle errors gracefully
     upload.array('images', 10)(req, res, (err) => {
       if (err) {
         console.error('Multer error:', err.message);
@@ -233,22 +255,24 @@ router.post(
         });
       }
 
+      const dbClient = supabaseAdmin || supabase;
+
       // Get user profile for owner details
-      const { data: userProfile } = await supabase
+      const { data: userProfiles } = await dbClient
         .from('users')
         .select('name, phone')
-        .eq('id', req.userId)
-        .single();
+        .eq('id', req.userId);
+      const userProfile = userProfiles && userProfiles.length > 0 ? userProfiles[0] : null;
 
       // Upload images to Supabase Storage
       const imageUrls = [];
       console.log('Files received:', req.files ? req.files.length : 0);
-      console.log('Files object:', req.files);
+      
       if (req.files && req.files.length > 0) {
         console.log(`Processing ${req.files.length} files for upload...`);
+        const storageClient = supabaseAdmin || supabase;
         
         for (const file of req.files) {
-          // Validate file is an image by checking extension or mimetype
           const allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'];
           const fileExt = file.originalname.split('.').pop().toLowerCase();
           const isImage = file.mimetype.startsWith('image/') || allowedExts.includes(fileExt);
@@ -260,26 +284,17 @@ router.post(
           
           const fileName = `properties/${uuidv4()}.${fileExt}`;
           
-          // Determine correct content type
           let contentType = file.mimetype;
           if (!contentType.startsWith('image/')) {
-            // Fallback content type based on extension
             const mimeMap = {
-              'jpg': 'image/jpeg',
-              'jpeg': 'image/jpeg', 
-              'png': 'image/png',
-              'gif': 'image/gif',
-              'webp': 'image/webp',
-              'heic': 'image/heic',
-              'heif': 'image/heif',
+              'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+              'png': 'image/png', 'gif': 'image/gif',
+              'webp': 'image/webp', 'heic': 'image/heic', 'heif': 'image/heif',
             };
             contentType = mimeMap[fileExt] || 'image/jpeg';
           }
 
           console.log(`Uploading: ${fileName} (${contentType})`);
-          
-          // Use admin client for storage to bypass RLS
-          const storageClient = supabaseAdmin || supabase;
           
           const { data: uploadData, error: uploadError } = await storageClient.storage
             .from('property-images')
@@ -289,7 +304,7 @@ router.post(
             });
 
           if (uploadError) {
-            console.error(`Upload error for ${fileName}:`, uploadError.message, uploadError);
+            console.error(`Upload error for ${fileName}:`, uploadError.message);
           } else {
             const { data: urlData } = storageClient.storage
               .from('property-images')
@@ -321,21 +336,27 @@ router.post(
         latitude: req.body.latitude ? parseFloat(req.body.latitude) : null,
         longitude: req.body.longitude ? parseFloat(req.body.longitude) : null,
         is_featured: req.body.isFeatured === 'true',
-        // Remove status field to use database default
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      const result = await createProperty(propertyData);
+      const { data, error } = await dbClient
+        .from('properties')
+        .insert([propertyData])
+        .select();
 
-      if (!result.success) {
-        return res.status(400).json(result);
+      if (error) {
+        console.error('Property creation error:', error);
+        return res.status(400).json({
+          success: false,
+          error: error.message,
+        });
       }
 
       res.status(201).json({
         success: true,
         message: 'Property created successfully',
-        data: result.data,
+        data: data && data.length > 0 ? data[0] : propertyData,
       });
     } catch (error) {
       console.error('Create property error:', error);
@@ -358,9 +379,22 @@ router.put(
   upload.array('images', 10),
   async (req, res) => {
     try {
+      const dbClient = supabaseAdmin || supabase;
+      
       // Check if user owns the property
-      const property = await getPropertyById(req.params.id);
-      if (!property.success || property.data.owner_id !== req.userId) {
+      const { data: propertyData, error: fetchError } = await dbClient
+        .from('properties')
+        .select('*')
+        .eq('id', req.params.id);
+
+      if (fetchError || !propertyData || propertyData.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Property not found',
+        });
+      }
+
+      if (propertyData[0].owner_id !== req.userId) {
         return res.status(403).json({
           success: false,
           error: 'You do not have permission to update this property',
@@ -386,23 +420,37 @@ router.put(
 
       // Handle new images
       if (req.files && req.files.length > 0) {
-        const imageUrls = property.data.images || [];
+        const storageClient = supabaseAdmin || supabase;
+        const imageUrls = propertyData[0].images || [];
+        
         for (const file of req.files) {
-          const fileExt = file.originalname.split('.').pop();
+          const fileExt = file.originalname.split('.').pop().toLowerCase();
           const fileName = `properties/${uuidv4()}.${fileExt}`;
+          
+          let contentType = file.mimetype;
+          if (!contentType.startsWith('image/')) {
+            const mimeMap = {
+              'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+              'png': 'image/png', 'gif': 'image/gif',
+              'webp': 'image/webp', 'heic': 'image/heic'
+            };
+            contentType = mimeMap[fileExt] || 'image/jpeg';
+          }
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await storageClient.storage
             .from('property-images')
             .upload(fileName, file.buffer, {
-              contentType: file.mimetype,
+              contentType: contentType,
               upsert: false,
             });
 
           if (!uploadError) {
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = storageClient.storage
               .from('property-images')
               .getPublicUrl(fileName);
             imageUrls.push(urlData.publicUrl);
+          } else {
+            console.error('Image upload error:', uploadError);
           }
         }
         updates.images = imageUrls;
@@ -410,16 +458,23 @@ router.put(
 
       updates.updated_at = new Date().toISOString();
 
-      const result = await updateProperty(req.params.id, updates);
+      const { data: updatedData, error: updateError } = await dbClient
+        .from('properties')
+        .update(updates)
+        .eq('id', req.params.id)
+        .select();
 
-      if (!result.success) {
-        return res.status(400).json(result);
+      if (updateError) {
+        return res.status(400).json({
+          success: false,
+          error: updateError.message,
+        });
       }
 
       res.json({
         success: true,
         message: 'Property updated successfully',
-        data: result.data,
+        data: updatedData && updatedData.length > 0 ? updatedData[0] : null,
       });
     } catch (error) {
       console.error('Update property error:', error);
@@ -438,19 +493,38 @@ router.put(
  */
 router.delete('/:id', authenticate, async (req, res) => {
   try {
+    const dbClient = supabaseAdmin || supabase;
+    
     // Check if user owns the property
-    const property = await getPropertyById(req.params.id);
-    if (!property.success || property.data.owner_id !== req.userId) {
+    const { data: propertyData, error: fetchError } = await dbClient
+      .from('properties')
+      .select('owner_id')
+      .eq('id', req.params.id);
+
+    if (fetchError || !propertyData || propertyData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found',
+      });
+    }
+
+    if (propertyData[0].owner_id !== req.userId) {
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to delete this property',
       });
     }
 
-    const result = await deleteProperty(req.params.id);
+    const { error: deleteError } = await dbClient
+      .from('properties')
+      .delete()
+      .eq('id', req.params.id);
 
-    if (!result.success) {
-      return res.status(400).json(result);
+    if (deleteError) {
+      return res.status(400).json({
+        success: false,
+        error: deleteError.message,
+      });
     }
 
     res.json({
@@ -473,30 +547,41 @@ router.delete('/:id', authenticate, async (req, res) => {
  */
 router.get('/:id/similar', optionalAuth, async (req, res) => {
   try {
-    const property = await getPropertyById(req.params.id);
-    if (!property.success) {
-      return res.status(404).json(property);
+    const dbClient = supabaseAdmin || supabase;
+    
+    // Get the property first
+    const { data: propertyData, error: fetchError } = await dbClient
+      .from('properties')
+      .select('property_type, transaction_type, area')
+      .eq('id', req.params.id);
+
+    if (fetchError || !propertyData || propertyData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found',
+      });
     }
 
-    const filters = {
-      propertyType: property.data.property_type,
-      transactionType: property.data.transaction_type,
-      area: property.data.area,
-    };
+    const property = propertyData[0];
 
-    const result = await getAllProperties(filters);
-    if (!result.success) {
-      return res.status(400).json(result);
+    // Get similar properties
+    const { data: similarData, error: similarError } = await dbClient
+      .from('properties')
+      .select('*')
+      .eq('property_type', property.property_type)
+      .neq('id', req.params.id)
+      .limit(5);
+
+    if (similarError) {
+      return res.status(400).json({
+        success: false,
+        error: similarError.message,
+      });
     }
-
-    // Filter out current property and limit to 5
-    const similarProperties = result.data
-      .filter(p => p.id !== req.params.id)
-      .slice(0, 5);
 
     res.json({
       success: true,
-      data: similarProperties,
+      data: similarData || [],
     });
   } catch (error) {
     console.error('Get similar properties error:', error);
