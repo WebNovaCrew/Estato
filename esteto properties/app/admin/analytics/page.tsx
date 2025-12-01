@@ -12,73 +12,89 @@ import {
   ArrowDownRight,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
+  RefreshCw
 } from 'lucide-react'
-import { shouldUseMockData } from '@/lib/mock-api'
+import { apiClient } from '@/lib/api-client'
+import { toast } from 'sonner'
 
 export default function AdminAnalyticsPage() {
   const [timeRange, setTimeRange] = useState('30d')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const [stats, setStats] = useState({
-    totalViews: 45230,
-    totalUsers: 1250,
-    totalProperties: 342,
-    totalBookings: 89,
-    revenue: 2450000,
-    conversionRate: 3.2,
+    totalViews: 0,
+    totalUsers: 0,
+    totalProperties: 0,
+    totalBookings: 0,
+    revenue: 0,
+    conversionRate: 0,
   })
 
   const [chartData, setChartData] = useState({
-    userGrowth: [
-      { month: 'Jan', users: 120 },
-      { month: 'Feb', users: 180 },
-      { month: 'Mar', users: 250 },
-      { month: 'Apr', users: 320 },
-      { month: 'May', users: 410 },
-      { month: 'Jun', users: 520 },
-      { month: 'Jul', users: 680 },
-      { month: 'Aug', users: 820 },
-      { month: 'Sep', users: 950 },
-      { month: 'Oct', users: 1100 },
-      { month: 'Nov', users: 1250 },
-    ],
-    propertyViews: [
-      { day: 'Mon', views: 1200 },
-      { day: 'Tue', views: 1450 },
-      { day: 'Wed', views: 1380 },
-      { day: 'Thu', views: 1520 },
-      { day: 'Fri', views: 1680 },
-      { day: 'Sat', views: 2100 },
-      { day: 'Sun', views: 1900 },
-    ],
-    propertyTypes: [
-      { type: 'Flat', count: 145, percentage: 42 },
-      { type: 'House', count: 89, percentage: 26 },
-      { type: 'Villa', count: 52, percentage: 15 },
-      { type: 'Plot', count: 38, percentage: 11 },
-      { type: 'Commercial', count: 18, percentage: 6 },
-    ],
-    topLocations: [
-      { location: 'Gomti Nagar', properties: 78, views: 12500 },
-      { location: 'Hazratganj', properties: 45, views: 8900 },
-      { location: 'Aliganj', properties: 38, views: 6700 },
-      { location: 'Indira Nagar', properties: 32, views: 5400 },
-      { location: 'Mahanagar', properties: 28, views: 4200 },
-    ],
-    recentActivity: [
-      { type: 'booking', message: 'New booking for 3BHK in Gomti Nagar', time: '5 min ago' },
-      { type: 'user', message: 'New user registered: Rahul S.', time: '12 min ago' },
-      { type: 'property', message: 'Property listed: Villa in Hazratganj', time: '25 min ago' },
-      { type: 'review', message: 'New review on Modern Apartment', time: '1 hour ago' },
-      { type: 'booking', message: 'Booking confirmed for Plot in Aliganj', time: '2 hours ago' },
-    ],
+    userGrowth: [] as { month: string; users: number }[],
+    propertyViews: [] as { day: string; views: number }[],
+    propertyTypes: [] as { type: string; count: number; percentage: number }[],
+    topLocations: [] as { location: string; properties: number; views: number }[],
+    recentActivity: [] as { type: string; message: string; time: string }[],
   })
 
+  const fetchAnalytics = async () => {
+    try {
+      const response = await apiClient.getAnalytics(timeRange);
+      
+      if (response.success && response.data) {
+        const { stats: apiStats, charts } = response.data;
+        
+        setStats({
+          totalViews: apiStats.totalViews || 0,
+          totalUsers: apiStats.totalUsers || 0,
+          totalProperties: apiStats.totalProperties || 0,
+          totalBookings: apiStats.totalBookings || 0,
+          revenue: apiStats.revenue || 0,
+          conversionRate: apiStats.conversionRate || 0,
+        });
+        
+        setChartData({
+          userGrowth: charts.userGrowth || [],
+          propertyViews: charts.propertyViews || [],
+          propertyTypes: charts.propertyTypes || [],
+          topLocations: charts.topLocations || [],
+          recentActivity: charts.recentActivity || [],
+        });
+      } else {
+        // Fallback to basic stats if analytics fails
+        const statsResponse = await apiClient.getDashboardStats();
+        if (statsResponse.success && statsResponse.data) {
+          setStats({
+            totalViews: 0,
+            totalUsers: statsResponse.data.totalUsers || 0,
+            totalProperties: statsResponse.data.totalProperties || 0,
+            totalBookings: statsResponse.data.totalBookings || 0,
+            revenue: statsResponse.data.totalRevenue || 0,
+            conversionRate: 0,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 500)
-  }, [])
+    fetchAnalytics();
+  }, [timeRange]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchAnalytics();
+    toast.success('Analytics refreshed');
+  };
 
   const StatCard = ({ title, value, change, icon: Icon, color }: any) => (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
@@ -112,18 +128,28 @@ export default function AdminAnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <p className="text-gray-600 mt-1">Track your platform performance</p>
+          <p className="text-gray-600 mt-1">Track your platform performance with real-time data</p>
         </div>
-        <select
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-          <option value="1y">Last year</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            title="Refresh data"
+          >
+            <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="1y">Last year</option>
+          </select>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -144,15 +170,24 @@ export default function AdminAnalyticsPage() {
             <BarChart3 className="w-5 h-5 text-gray-400" />
           </div>
           <div className="h-64 flex items-end justify-between gap-2">
-            {chartData.userGrowth.map((item, index) => (
-              <div key={item.month} className="flex-1 flex flex-col items-center">
-                <div 
-                  className="w-full bg-primary-500 rounded-t-sm transition-all hover:bg-primary-600"
-                  style={{ height: `${(item.users / 1250) * 200}px` }}
-                ></div>
-                <span className="text-xs text-gray-500 mt-2">{item.month}</span>
+            {chartData.userGrowth.length > 0 ? (
+              chartData.userGrowth.map((item) => {
+                const maxUsers = Math.max(...chartData.userGrowth.map(u => u.users), 1);
+                return (
+                  <div key={item.month} className="flex-1 flex flex-col items-center">
+                    <div 
+                      className="w-full bg-primary-500 rounded-t-sm transition-all hover:bg-primary-600"
+                      style={{ height: `${(item.users / maxUsers) * 200}px`, minHeight: '4px' }}
+                    ></div>
+                    <span className="text-xs text-gray-500 mt-2">{item.month}</span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400">
+                No user data available
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -163,15 +198,24 @@ export default function AdminAnalyticsPage() {
             <Activity className="w-5 h-5 text-gray-400" />
           </div>
           <div className="h-64 flex items-end justify-between gap-4">
-            {chartData.propertyViews.map((item) => (
-              <div key={item.day} className="flex-1 flex flex-col items-center">
-                <div 
-                  className="w-full bg-green-500 rounded-t-sm transition-all hover:bg-green-600"
-                  style={{ height: `${(item.views / 2100) * 200}px` }}
-                ></div>
-                <span className="text-xs text-gray-500 mt-2">{item.day}</span>
+            {chartData.propertyViews.length > 0 ? (
+              chartData.propertyViews.map((item) => {
+                const maxViews = Math.max(...chartData.propertyViews.map(v => v.views), 1);
+                return (
+                  <div key={item.day} className="flex-1 flex flex-col items-center">
+                    <div 
+                      className="w-full bg-green-500 rounded-t-sm transition-all hover:bg-green-600"
+                      style={{ height: `${(item.views / maxViews) * 200}px`, minHeight: '4px' }}
+                    ></div>
+                    <span className="text-xs text-gray-500 mt-2">{item.day}</span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400">
+                No views data available
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -184,23 +228,27 @@ export default function AdminAnalyticsPage() {
             <PieChart className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-4">
-            {chartData.propertyTypes.map((item, index) => {
-              const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500']
-              return (
-                <div key={item.type}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-700">{item.type}</span>
-                    <span className="text-sm font-medium text-gray-900">{item.count} ({item.percentage}%)</span>
+            {chartData.propertyTypes.length > 0 ? (
+              chartData.propertyTypes.map((item, index) => {
+                const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500']
+                return (
+                  <div key={item.type}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-700">{item.type}</span>
+                      <span className="text-sm font-medium text-gray-900">{item.count} ({item.percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div 
+                        className={`${colors[index % colors.length]} h-2 rounded-full transition-all`}
+                        style={{ width: `${item.percentage}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div 
-                      className={`${colors[index]} h-2 rounded-full transition-all`}
-                      style={{ width: `${item.percentage}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })
+            ) : (
+              <p className="text-gray-400 text-center py-8">No property data available</p>
+            )}
           </div>
         </div>
 
@@ -210,20 +258,24 @@ export default function AdminAnalyticsPage() {
             <h2 className="font-semibold text-gray-900">Top Locations</h2>
           </div>
           <div className="space-y-3">
-            {chartData.topLocations.map((item, index) => (
-              <div key={item.location} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-sm font-medium">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <p className="font-medium text-gray-900">{item.location}</p>
-                    <p className="text-xs text-gray-500">{item.properties} properties</p>
+            {chartData.topLocations.length > 0 ? (
+              chartData.topLocations.map((item, index) => (
+                <div key={item.location} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-sm font-medium">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <p className="font-medium text-gray-900">{item.location}</p>
+                      <p className="text-xs text-gray-500">{item.properties} properties</p>
+                    </div>
                   </div>
+                  <span className="text-sm text-gray-600">{item.views >= 1000 ? `${(item.views / 1000).toFixed(1)}k` : item.views} views</span>
                 </div>
-                <span className="text-sm text-gray-600">{(item.views / 1000).toFixed(1)}k views</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-gray-400 text-center py-8">No location data available</p>
+            )}
           </div>
         </div>
 
@@ -233,27 +285,31 @@ export default function AdminAnalyticsPage() {
             <h2 className="font-semibold text-gray-900">Recent Activity</h2>
           </div>
           <div className="space-y-3">
-            {chartData.recentActivity.map((item, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  item.type === 'booking' ? 'bg-green-100' :
-                  item.type === 'user' ? 'bg-blue-100' :
-                  item.type === 'property' ? 'bg-purple-100' :
-                  'bg-yellow-100'
-                }`}>
-                  <Activity className={`w-4 h-4 ${
-                    item.type === 'booking' ? 'text-green-600' :
-                    item.type === 'user' ? 'text-blue-600' :
-                    item.type === 'property' ? 'text-purple-600' :
-                    'text-yellow-600'
-                  }`} />
+            {chartData.recentActivity.length > 0 ? (
+              chartData.recentActivity.map((item, index) => (
+                <div key={index} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    item.type === 'booking' ? 'bg-green-100' :
+                    item.type === 'user' ? 'bg-blue-100' :
+                    item.type === 'property' ? 'bg-purple-100' :
+                    'bg-yellow-100'
+                  }`}>
+                    <Activity className={`w-4 h-4 ${
+                      item.type === 'booking' ? 'text-green-600' :
+                      item.type === 'user' ? 'text-blue-600' :
+                      item.type === 'property' ? 'text-purple-600' :
+                      'text-yellow-600'
+                    }`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900 line-clamp-1">{item.message}</p>
+                    <p className="text-xs text-gray-500">{item.time}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 line-clamp-1">{item.message}</p>
-                  <p className="text-xs text-gray-500">{item.time}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-gray-400 text-center py-8">No recent activity</p>
+            )}
           </div>
         </div>
       </div>

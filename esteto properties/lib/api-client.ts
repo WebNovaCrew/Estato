@@ -173,6 +173,11 @@ class ApiClient {
     return this.request('/admin/dashboard');
   }
 
+  // Analytics
+  async getAnalytics(timeRange: string = '30d') {
+    return this.request(`/admin/analytics?timeRange=${timeRange}`);
+  }
+
   // Properties - Try admin endpoint first, fall back to public
   async getProperties(status?: string) {
     const query = status ? `?status=${status}` : '';
