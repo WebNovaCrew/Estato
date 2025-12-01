@@ -7,8 +7,11 @@ const {
   createChat,
   sendMessage,
 } = require('../config/database');
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 const { emitNewMessage } = require('../services/socket');
+
+// Use admin client for all operations to bypass RLS
+const getDbClient = () => supabaseAdmin || supabase;
 
 /**
  * @route   GET /api/chats
@@ -231,6 +234,201 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Send message error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+    });
+  }
+});
+
+/**
+ * @route   GET /api/chats/contact/:propertyId
+ * @desc    Get property owner contact info for messaging/WhatsApp
+ * @access  Private
+ */
+router.get('/contact/:propertyId', authenticate, async (req, res) => {
+  try {
+    const dbClient = getDbClient();
+    
+    // Get property with owner info
+    const { data: properties, error: propertyError } = await dbClient
+      .from('properties')
+      .select('id, title, owner_id, owner_name, owner_phone')
+      .eq('id', req.params.propertyId);
+
+    if (propertyError || !properties || properties.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found',
+      });
+    }
+
+    const property = properties[0];
+
+    // Get owner's user profile for additional info
+    const { data: ownerProfiles } = await dbClient
+      .from('users')
+      .select('id, name, phone, email')
+      .eq('id', property.owner_id);
+
+    const owner = ownerProfiles && ownerProfiles.length > 0 ? ownerProfiles[0] : null;
+    const phone = property.owner_phone || owner?.phone || '';
+    
+    // Format phone for WhatsApp (remove spaces, add country code if needed)
+    let whatsappNumber = phone.replace(/[\s\-\(\)]/g, '');
+    if (whatsappNumber.startsWith('0')) {
+      whatsappNumber = '91' + whatsappNumber.substring(1); // India country code
+    } else if (!whatsappNumber.startsWith('+') && !whatsappNumber.startsWith('91')) {
+      whatsappNumber = '91' + whatsappNumber;
+    }
+    whatsappNumber = whatsappNumber.replace('+', '');
+
+    // Create WhatsApp message
+    const whatsappMessage = encodeURIComponent(
+      `Hi! I'm interested in your property "${property.title}" listed on Estato. Can we discuss?`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        propertyId: property.id,
+        propertyTitle: property.title,
+        ownerId: property.owner_id,
+        ownerName: property.owner_name || owner?.name || 'Property Owner',
+        ownerPhone: phone,
+        ownerEmail: owner?.email || null,
+        whatsappLink: phone ? `https://wa.me/${whatsappNumber}?text=${whatsappMessage}` : null,
+        canMessage: true,
+      },
+    });
+  } catch (error) {
+    console.error('Get contact info error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+    });
+  }
+});
+
+/**
+ * @route   POST /api/chats/start/:propertyId
+ * @desc    Start a chat with property owner
+ * @access  Private
+ */
+router.post('/start/:propertyId', authenticate, async (req, res) => {
+  try {
+    const dbClient = getDbClient();
+    const { message } = req.body;
+    
+    // Get property with owner info
+    const { data: properties, error: propertyError } = await dbClient
+      .from('properties')
+      .select('id, title, owner_id, owner_name')
+      .eq('id', req.params.propertyId);
+
+    if (propertyError || !properties || properties.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found',
+      });
+    }
+
+    const property = properties[0];
+
+    // Can't message yourself
+    if (property.owner_id === req.userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot message yourself',
+      });
+    }
+
+    // Check if chat already exists
+    const { data: existingChats } = await dbClient
+      .from('chats')
+      .select('id')
+      .eq('property_id', req.params.propertyId)
+      .or(`and(participant1_id.eq.${req.userId},participant2_id.eq.${property.owner_id}),and(participant1_id.eq.${property.owner_id},participant2_id.eq.${req.userId})`);
+
+    if (existingChats && existingChats.length > 0) {
+      // Chat exists, just send the message if provided
+      if (message) {
+        const { data: sender } = await dbClient
+          .from('users')
+          .select('name')
+          .eq('id', req.userId);
+
+        const messageData = {
+          chat_id: existingChats[0].id,
+          sender_id: req.userId,
+          sender_name: sender && sender.length > 0 ? sender[0].name : 'Unknown',
+          content: message.trim(),
+          created_at: new Date().toISOString(),
+        };
+
+        await sendMessage(messageData);
+      }
+
+      return res.json({
+        success: true,
+        message: 'Chat already exists',
+        data: { chatId: existingChats[0].id },
+        existing: true,
+      });
+    }
+
+    // Get user names
+    const { data: user1 } = await dbClient
+      .from('users')
+      .select('name')
+      .eq('id', req.userId);
+
+    // Create new chat
+    const chatData = {
+      participant1_id: req.userId,
+      participant1_name: user1 && user1.length > 0 ? user1[0].name : 'Unknown',
+      participant2_id: property.owner_id,
+      participant2_name: property.owner_name || 'Property Owner',
+      property_id: property.id,
+      property_title: property.title,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: newChat, error: chatError } = await dbClient
+      .from('chats')
+      .insert([chatData])
+      .select();
+
+    if (chatError) {
+      return res.status(400).json({
+        success: false,
+        error: chatError.message,
+      });
+    }
+
+    const chat = newChat && newChat.length > 0 ? newChat[0] : null;
+
+    // Send initial message if provided
+    if (message && chat) {
+      const messageData = {
+        chat_id: chat.id,
+        sender_id: req.userId,
+        sender_name: chatData.participant1_name,
+        content: message.trim(),
+        created_at: new Date().toISOString(),
+      };
+
+      await sendMessage(messageData);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Chat started successfully',
+      data: { chatId: chat?.id, chat },
+    });
+  } catch (error) {
+    console.error('Start chat error:', error);
     res.status(500).json({
       success: false,
       error: 'Server error',

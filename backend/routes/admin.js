@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
+
+// Use admin client for all operations to bypass RLS
+const getDbClient = () => supabaseAdmin || supabase;
 
 /**
  * @route   GET /api/admin/dashboard
@@ -128,15 +131,19 @@ router.get('/properties', authenticate, requireAdmin, async (req, res) => {
  */
 router.put('/properties/:id/approve', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const dbClient = getDbClient();
+    
+    const { data, error } = await dbClient
       .from('properties')
       .update({
         status: 'approved',
+        admin_comment: null,
+        reviewed_by: req.userId,
+        reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', req.params.id)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       return res.status(400).json({
@@ -148,7 +155,7 @@ router.put('/properties/:id/approve', authenticate, requireAdmin, async (req, re
     res.json({
       success: true,
       message: 'Property approved successfully',
-      data,
+      data: data && data.length > 0 ? data[0] : null,
     });
   } catch (error) {
     console.error('Approve property error:', error);
@@ -166,15 +173,20 @@ router.put('/properties/:id/approve', authenticate, requireAdmin, async (req, re
  */
 router.put('/properties/:id/reject', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { reason } = req.body;
+    const dbClient = getDbClient();
+    
+    const { data, error } = await dbClient
       .from('properties')
       .update({
         status: 'rejected',
+        admin_comment: reason || null,
+        reviewed_by: req.userId,
+        reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', req.params.id)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       return res.status(400).json({
@@ -186,10 +198,59 @@ router.put('/properties/:id/reject', authenticate, requireAdmin, async (req, res
     res.json({
       success: true,
       message: 'Property rejected',
-      data,
+      data: data && data.length > 0 ? data[0] : null,
     });
   } catch (error) {
     console.error('Reject property error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/admin/properties/:id/comment
+ * @desc    Add admin comment/feedback for improvement
+ * @access  Private (Admin only)
+ */
+router.put('/properties/:id/comment', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { comment, status } = req.body;
+    const dbClient = getDbClient();
+    
+    const updateData = {
+      admin_comment: comment,
+      reviewed_by: req.userId,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Optionally update status (e.g., 'needs_revision')
+    if (status) {
+      updateData.status = status;
+    }
+    
+    const { data, error } = await dbClient
+      .from('properties')
+      .update(updateData)
+      .eq('id', req.params.id)
+      .select();
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Comment added successfully',
+      data: data && data.length > 0 ? data[0] : null,
+    });
+  } catch (error) {
+    console.error('Add comment error:', error);
     res.status(500).json({
       success: false,
       error: 'Server error',

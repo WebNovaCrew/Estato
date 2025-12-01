@@ -86,60 +86,145 @@ class PropertyProvider with ChangeNotifier {
       final response = await ApiClient.getFavorites();
       if (response['success'] == true) {
         final List<dynamic> data = response['data'] ?? [];
-        _favoriteIds = data.map((item) => item['property_id']?.toString() ?? '').toList();
-        _favoriteProperties = data
-            .where((item) => item['properties'] != null)
-            .map((item) => Property.fromJson(item['properties']))
-            .toList();
+        // New API returns properties directly with favoriteId field
+        _favoriteProperties = data.map((item) => Property.fromJson(item)).toList();
+        _favoriteIds = _favoriteProperties.map((p) => p.id).toList();
         notifyListeners();
       }
     } catch (e) {
-      // Handle error silently
+      debugPrint('Error loading favorites: $e');
+    }
+  }
+
+  /// Load just favorite IDs for quick checks
+  Future<void> loadFavoriteIds() async {
+    try {
+      final response = await ApiClient.getFavoriteIds();
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'] ?? [];
+        _favoriteIds = data.map((id) => id.toString()).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading favorite IDs: $e');
     }
   }
 
   /// Add property to favorites via API
   Future<bool> addToFavorites(String propertyId) async {
     try {
-      final response = await ApiClient.addFavorite(propertyId);
-      if (response['success'] == true) {
+      // Optimistic update
+      if (!_favoriteIds.contains(propertyId)) {
         _favoriteIds.add(propertyId);
         final property = getPropertyById(propertyId);
-        if (property != null) {
+        if (property != null && !_favoriteProperties.any((p) => p.id == propertyId)) {
           _favoriteProperties.add(property);
         }
         notifyListeners();
+      }
+
+      final response = await ApiClient.addFavorite(propertyId);
+      if (response['success'] == true) {
         return true;
+      } else {
+        // Revert on failure
+        _favoriteIds.remove(propertyId);
+        _favoriteProperties.removeWhere((p) => p.id == propertyId);
+        notifyListeners();
+        debugPrint('Add favorite failed: ${response['error']}');
       }
     } catch (e) {
-      // Handle error silently
+      // Revert on error
+      _favoriteIds.remove(propertyId);
+      _favoriteProperties.removeWhere((p) => p.id == propertyId);
+      notifyListeners();
+      debugPrint('Add favorite error: $e');
     }
     return false;
   }
 
   /// Remove property from favorites via API
   Future<bool> removeFromFavorites(String propertyId) async {
+    // Store for potential revert
+    final wasInFavorites = _favoriteIds.contains(propertyId);
+    final removedProperty = _favoriteProperties.where((p) => p.id == propertyId).toList();
+    
     try {
+      // Optimistic update
+      _favoriteIds.remove(propertyId);
+      _favoriteProperties.removeWhere((p) => p.id == propertyId);
+      notifyListeners();
+
       final response = await ApiClient.removeFavorite(propertyId);
       if (response['success'] == true) {
-        _favoriteIds.remove(propertyId);
-        _favoriteProperties.removeWhere((p) => p.id == propertyId);
-        notifyListeners();
         return true;
+      } else {
+        // Revert on failure
+        if (wasInFavorites) {
+          _favoriteIds.add(propertyId);
+          _favoriteProperties.addAll(removedProperty);
+          notifyListeners();
+        }
+        debugPrint('Remove favorite failed: ${response['error']}');
       }
     } catch (e) {
-      // Handle error silently
+      // Revert on error
+      if (wasInFavorites) {
+        _favoriteIds.add(propertyId);
+        _favoriteProperties.addAll(removedProperty);
+        notifyListeners();
+      }
+      debugPrint('Remove favorite error: $e');
     }
     return false;
   }
 
-  /// Toggle favorite status
+  /// Toggle favorite status using the toggle API
   Future<bool> toggleFavorite(String propertyId) async {
-    if (_favoriteIds.contains(propertyId)) {
-      return await removeFromFavorites(propertyId);
-    } else {
-      return await addToFavorites(propertyId);
+    final wasInFavorites = _favoriteIds.contains(propertyId);
+    final property = getPropertyById(propertyId);
+    
+    try {
+      // Optimistic update
+      if (wasInFavorites) {
+        _favoriteIds.remove(propertyId);
+        _favoriteProperties.removeWhere((p) => p.id == propertyId);
+      } else {
+        _favoriteIds.add(propertyId);
+        if (property != null && !_favoriteProperties.any((p) => p.id == propertyId)) {
+          _favoriteProperties.add(property);
+        }
+      }
+      notifyListeners();
+
+      final response = await ApiClient.toggleFavorite(propertyId);
+      if (response['success'] == true) {
+        return true;
+      } else {
+        // Revert on failure
+        if (wasInFavorites) {
+          _favoriteIds.add(propertyId);
+          if (property != null) _favoriteProperties.add(property);
+        } else {
+          _favoriteIds.remove(propertyId);
+          _favoriteProperties.removeWhere((p) => p.id == propertyId);
+        }
+        notifyListeners();
+        debugPrint('Toggle favorite failed: ${response['error']}');
+      }
+    } catch (e) {
+      // Revert on error
+      if (wasInFavorites) {
+        _favoriteIds.add(propertyId);
+        if (property != null) _favoriteProperties.add(property);
+      } else {
+        _favoriteIds.remove(propertyId);
+        _favoriteProperties.removeWhere((p) => p.id == propertyId);
+      }
+      notifyListeners();
+      debugPrint('Toggle favorite error: $e');
     }
+    return false;
   }
 
   /// Check if property is favorite

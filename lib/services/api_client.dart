@@ -530,8 +530,20 @@ class ApiClient {
     return await _makeRequest('GET', '/favorites');
   }
 
+  static Future<Map<String, dynamic>> getFavoriteIds() async {
+    return await _makeRequest('GET', '/favorites/ids');
+  }
+
+  static Future<Map<String, dynamic>> checkFavorite(String propertyId) async {
+    return await _makeRequest('GET', '/favorites/check/$propertyId');
+  }
+
   static Future<Map<String, dynamic>> addFavorite(String propertyId) async {
     return await _makeRequest('POST', '/favorites', body: {'propertyId': propertyId});
+  }
+
+  static Future<Map<String, dynamic>> toggleFavorite(String propertyId) async {
+    return await _makeRequest('POST', '/favorites/toggle', body: {'propertyId': propertyId});
   }
 
   static Future<Map<String, dynamic>> removeFavorite(String propertyId) async {
@@ -560,6 +572,16 @@ class ApiClient {
   static Future<Map<String, dynamic>> sendMessage(String chatId, String content) async {
     return await _makeRequest('POST', '/chats/$chatId/messages', body: {
       'content': content,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getPropertyContact(String propertyId) async {
+    return await _makeRequest('GET', '/chats/contact/$propertyId');
+  }
+
+  static Future<Map<String, dynamic>> startChatWithOwner(String propertyId, {String? message}) async {
+    return await _makeRequest('POST', '/chats/start/$propertyId', body: {
+      if (message != null) 'message': message,
     });
   }
 

@@ -49,6 +49,15 @@ router.get('/', optionalAuth, async (req, res) => {
     const dbClient = supabaseAdmin || supabase;
     let query = dbClient.from('properties').select('*');
 
+    // Only show approved properties to public (unless admin or owner)
+    // For public users, only show approved properties
+    if (!req.userId) {
+      query = query.eq('status', 'approved');
+    } else if (req.query.showAll !== 'true') {
+      // For logged-in users, show approved properties by default
+      query = query.eq('status', 'approved');
+    }
+
     if (req.query.propertyType) {
       query = query.eq('property_type', req.query.propertyType);
     }
@@ -336,6 +345,7 @@ router.post(
         latitude: req.body.latitude ? parseFloat(req.body.latitude) : null,
         longitude: req.body.longitude ? parseFloat(req.body.longitude) : null,
         is_featured: req.body.isFeatured === 'true',
+        status: 'pending', // New properties go to pending for admin approval
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -355,8 +365,9 @@ router.post(
 
       res.status(201).json({
         success: true,
-        message: 'Property created successfully',
+        message: 'Property submitted successfully! It will be visible after admin approval.',
         data: data && data.length > 0 ? data[0] : propertyData,
+        pendingApproval: true,
       });
     } catch (error) {
       console.error('Create property error:', error);
