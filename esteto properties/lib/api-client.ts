@@ -3,15 +3,18 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://champ-y6eg.onrender.com/api';
 
-// Demo admin credentials for testing when backend is unavailable
+// Admin credentials - Real admin user in database
+// Password: Admin@123 (for real backend login)
+// Demo password: admin123 (for offline demo mode)
 const DEMO_ADMIN = {
   email: 'admin@estato.com',
-  password: 'admin123',
+  password: 'admin123', // Demo password for offline mode
+  realPassword: 'Admin@123', // Real password for backend
   token: 'demo-admin-token-12345',
   user: {
-    id: 'demo-admin',
+    id: '27144234-ceca-4721-92b0-a1b392ad0d55',
     email: 'admin@estato.com',
-    name: 'Demo Admin',
+    name: 'Estato Admin',
     role: 'admin',
     user_type: 'admin',
   }
@@ -84,7 +87,7 @@ class ApiClient {
 
   // Auth
   async login(email: string, password: string) {
-    // Check for demo credentials first
+    // Check for demo credentials (offline mode)
     if (email === DEMO_ADMIN.email && password === DEMO_ADMIN.password) {
       this.setToken(DEMO_ADMIN.token);
       return {
@@ -98,6 +101,7 @@ class ApiClient {
       };
     }
 
+    // Try real backend login
     try {
       const response = await this.request<{ token: string; accessToken: string; user: any }>('/auth/login', {
         method: 'POST',
@@ -109,13 +113,22 @@ class ApiClient {
         if (token) {
           this.setToken(token);
         }
+        
+        // For admin user, also set admin role in response
+        if (email === DEMO_ADMIN.email) {
+          response.data.user = {
+            ...response.data.user,
+            role: 'admin',
+            user_type: 'admin',
+          };
+        }
       }
       
       return response;
     } catch (error) {
       console.error('Login API error:', error);
-      // If backend is unreachable and using demo credentials, allow demo login
-      if (email === DEMO_ADMIN.email && password === DEMO_ADMIN.password) {
+      // If backend is unreachable and using admin email with either password, allow demo login
+      if (email === DEMO_ADMIN.email && (password === DEMO_ADMIN.password || password === DEMO_ADMIN.realPassword)) {
         this.setToken(DEMO_ADMIN.token);
         return {
           success: true,

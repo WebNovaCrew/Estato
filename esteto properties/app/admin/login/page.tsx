@@ -189,12 +189,13 @@ export default function AdminLoginPage() {
           </Link>
         </div>
 
-        {/* Demo Credentials (for testing) */}
+        {/* Admin Credentials */}
         <div className="mt-4 p-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
-          <p className="text-xs text-gray-500 text-center mb-2">Demo Credentials</p>
+          <p className="text-xs text-gray-500 text-center mb-2">Admin Credentials</p>
           <div className="text-xs text-gray-400 text-center space-y-1">
             <p>Email: <span className="text-gray-300 font-mono">admin@estato.com</span></p>
-            <p>Password: <span className="text-gray-300 font-mono">admin123</span></p>
+            <p>Password: <span className="text-gray-300 font-mono">Admin@123</span> (real)</p>
+            <p className="text-gray-500">or <span className="text-gray-400 font-mono">admin123</span> (demo)</p>
           </div>
         </div>
       </div>
