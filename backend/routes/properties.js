@@ -11,7 +11,7 @@ const {
 } = require('../config/database');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const { supabase } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../config/supabase');
 
 // Fix multer reference in error handler
 const MulterError = multer.MulterError;
@@ -278,7 +278,10 @@ router.post(
 
           console.log(`Uploading: ${fileName} (${contentType})`);
           
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          // Use admin client for storage to bypass RLS
+          const storageClient = supabaseAdmin || supabase;
+          
+          const { data: uploadData, error: uploadError } = await storageClient.storage
             .from('property-images')
             .upload(fileName, file.buffer, {
               contentType: contentType,
@@ -286,9 +289,9 @@ router.post(
             });
 
           if (uploadError) {
-            console.error(`Upload error for ${fileName}:`, uploadError.message);
+            console.error(`Upload error for ${fileName}:`, uploadError.message, uploadError);
           } else {
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = storageClient.storage
               .from('property-images')
               .getPublicUrl(fileName);
             imageUrls.push(urlData.publicUrl);
