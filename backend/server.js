@@ -101,10 +101,11 @@ app.get('/health', (req, res) => {
   const { supabaseAdmin } = require('./config/supabase');
   res.json({
     success: true,
-    message: 'Estato API is running',
+    message: 'Estato API is running - Image Upload Fixed',
     timestamp: new Date().toISOString(),
     adminClientEnabled: supabaseAdmin !== null,
     serviceKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    version: '1.2.0',
   });
 });
 
